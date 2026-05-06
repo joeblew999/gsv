@@ -55,5 +55,11 @@ jobs:
           install: true
           cache: true
 
+      - name: Cache cargo registry + cli/target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli -> target
+          shared-key: cli-${{ matrix.os }}
+
       - name: Run mise CI bundle (version-check + build-cli + test-cli)
         run: mise run ci
