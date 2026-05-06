@@ -1,0 +1,15 @@
+#!/usr/bin/env nu
+#MISE description="Run gateway TS tests + typecheck (vitest + tsc)"
+#MISE depends=["1-deps"]
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  cd $"($REPO_ROOT)/gateway"
+  print "→ tsc --noEmit..."
+  ^aube exec -- tsc --noEmit
+  print ""
+  print "→ vitest..."
+  ^aube test
+}

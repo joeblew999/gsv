@@ -1,11 +1,11 @@
 #!/usr/bin/env nu
-#MISE description="CI bundle: parse-check + build-cli + test-cli (run by Mise workflow)"
-#MISE depends=["ci-parse-check", "4-build-cli", "test-cli"]
+#MISE description="Full CI: parse-check + cli build/test + gateway tests + ripgit tests"
+#MISE depends=["ci-parse-check", "4-build-cli", "test-cli", "test-gateway", "test-ripgit"]
 
-# Version sync check is intentionally NOT here — it lives in upstream's ci.yml
-# (which runs on main, where versions actually get bumped). Our branch
-# doesn't change versions, so checking it on every CI run adds no value.
+# Mirrors what upstream's ci.yml validates that's actually
+# cross-platform-meaningful — drops only the wrangler --dry-run bundle jobs
+# (those are heavy and covered by upstream's own CI on main).
 
 def main [] {
-  print "✓ ci checks passed"
+  print "✓ all CI checks passed"
 }
