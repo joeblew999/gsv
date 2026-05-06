@@ -48,18 +48,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup mise
+      - name: Setup mise (installs sccache via cargo:sccache)
         uses: jdx/mise-action@v4
         with:
           version: 2026.5.1
           install: true
           cache: true
 
-      - name: Cache cargo registry + cli/target
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: cli -> target
-          shared-key: cli-${{ matrix.os }}
+      - name: Configure sccache to use GH Actions cache backend
+        uses: mozilla-actions/sccache-action@v0.0.5
 
       - name: Run mise CI bundle (version-check + build-cli + test-cli)
+        env:
+          SCCACHE_GHA_ENABLED: "true"
         run: mise run ci

@@ -29,12 +29,20 @@ zig = "0.13"
 # don't both call `cargo install worker-build` and contend on cargo's package
 # cache lock. Required for upstream's scripts/worker-build.sh.
 "cargo:worker-build" = "0.7"
-# aube — fast Node package manager (drop-in npm replacement). Side-by-side test
-# via mise-tasks/1-deps-aube; if it works we switch 1-deps to it.
+# aube — fast Node package manager (drop-in npm replacement).
 "github:endevco/aube" = "1.9.0"
+# sccache — Rust compiler cache. Speeds up local `cargo build` AND CI by caching
+# compiler invocations content-addressably. Set RUSTC_WRAPPER=sccache below.
+# github backend pulls Mozilla's prebuilt binary; cargo backend would chicken-
+# and-egg with RUSTC_WRAPPER.
+"github:mozilla/sccache" = "0.10.0"
 
 [env]
 CARGO_TERM_COLOR = "always"
+
+# sccache — speeds up local `cargo build` and CI alike. Locally writes to
+# ~/.cache/sccache; in CI add SCCACHE_GHA_ENABLED=true to use GH Actions cache.
+RUSTC_WRAPPER = "sccache"
 
 # Add project-local shims dir to PATH (no-op flock for macOS where util-linux's
 # flock isn't available, plus zig-cc target translator).
