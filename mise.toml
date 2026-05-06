@@ -10,6 +10,9 @@ includes = [
 
 [tools]
 # Pins required by the shared library at v0.10.0 (every shared task is nu).
+# 
+# pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
+"github:endevco/pitchfork" = "2.10.0"
 "github:nushell/nushell" = "0.112"
 "github:jdx/fnox"        = "1.23"
 "github:cli/cli"         = "2"      # gh CLI — github backend works (tags are v<semver>)
@@ -21,12 +24,14 @@ rust = { version = "stable", components = "rustfmt,clippy", targets = "wasm32-un
 # zig provides `zig cc` for cross-compiling C code to wasm32 (used by ripgit's
 # zstd dep via ripgit/scripts/wasm-cc). Apple clang doesn't ship wasm targets.
 zig = "0.13"
-# pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
-"github:endevco/pitchfork" = "2.10.0"
+
 # Pre-installed so the parallel rust-worker build hooks (ripgit + assembler)
 # don't both call `cargo install worker-build` and contend on cargo's package
 # cache lock. Required for upstream's scripts/worker-build.sh.
 "cargo:worker-build" = "0.7"
+# aube — fast Node package manager (drop-in npm replacement). Side-by-side test
+# via mise-tasks/1-deps-aube; if it works we switch 1-deps to it.
+"github:endevco/aube" = "1.9.0"
 
 [env]
 CARGO_TERM_COLOR = "always"
