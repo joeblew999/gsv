@@ -22,7 +22,7 @@
   },
   "aube": {
     "allowBuilds": {
-      "@mongodb-js/zstd": true,
+      "@mongodb-js/zstd": false,
       "core-js-pure": true,
       "esbuild": true,
       "protobufjs": true,
