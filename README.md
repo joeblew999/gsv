@@ -9,6 +9,9 @@ It offers an SDK for native applications and comes with a built-in git remote th
 Named after the planet-scale sentient ships from Iain M. Banks' Culture series, GSV (General Systems Vehicle) provides a foundation for self-aware personal AI that exists as ephemeral beings spawning across the Earth's edge network.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/deathbyknowledge/gsv)
+
+> **`joeblew999` branch:** Everything below works with the upstream bash scripts. This branch also adds a [mise](https://mise.jdx.dev) + [nushell](https://www.nushell.sh) + [aube](https://aube.en.dev) layer that does all of it via numbered tasks (`mise run system-local`, `mise run system-cloud`, `mise run system-up`) — bypassing `./scripts/*.sh` and `npm` entirely. See ["Running on the joeblew999 branch"](#running-on-the-joeblew999-branch-mise--nushell--aube) at the bottom.
+
 ## Quick Start
 
 ### Prerequisites
