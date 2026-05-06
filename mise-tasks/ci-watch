@@ -40,6 +40,25 @@ def step-duration [s: any, now: datetime] {
   ($end - $st) | format duration sec
 }
 
+# Retry wrapper around `gh run view --json` — transient TLS/EOF errors
+# happen a few times an hour. 5 attempts × 10s backoff = ~1 min ceiling.
+def gh-run-view-retry [id: int, token: string] {
+  mut attempts = 0
+  loop {
+    let r = (with-env {GH_TOKEN: $token} { do { ^gh run view $id --repo $REPO --json status,conclusion,jobs } | complete })
+    if $r.exit_code == 0 {
+      return ($r.stdout | from json)
+    }
+    $attempts = $attempts + 1
+    if $attempts >= 5 {
+      print --stderr $"✗ gh api failed after 5 attempts: ($r.stderr | default '?' | str trim)"
+      exit 1
+    }
+    print $"  · gh api blip \(attempt ($attempts)/5\), retrying in 10s..."
+    sleep 10sec
+  }
+}
+
 def status-mark [status: string, conclusion: string] {
   if $conclusion == "success" {
     "✓"
@@ -84,7 +103,7 @@ def main [
   mut failed_jobs = []
 
   loop {
-    let detail = (with-env {GH_TOKEN: $token} { ^gh run view $id --repo $REPO --json status,conclusion,jobs } | from json)
+    let detail = (gh-run-view-retry $id $token)
     let run_status = $detail.status
     let run_conclusion = ($detail.conclusion | default "")
     let now = (date now)

@@ -19,11 +19,11 @@ includes = [
 "aqua:jqlang/jq"         = "1"      # jq — tags are `jq-1.7.x`, github backend mis-parses, aqua maps it correctly
 
 # gsv-specific toolchain (matches existing CI: Node 24, Rust stable + wasm32 target).
-node = "24"
+node = "26"
 rust = { version = "stable", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
 # zig provides `zig cc` for cross-compiling C code to wasm32 (used by ripgit's
 # zstd dep via ripgit/scripts/wasm-cc). Apple clang doesn't ship wasm targets.
-zig = "0.13"
+zig = "0.16"
 
 # aube — fast Node package manager (drop-in npm replacement).
 "github:endevco/aube" = "1.9.0"
