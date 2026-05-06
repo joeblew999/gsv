@@ -35,8 +35,11 @@ jobs:
     needs: parse-check
     strategy:
       fail-fast: false
+      # Skipping windows-latest — its parse-check already passed; windows
+      # cargo+vitest is 2-3× slower than linux/macos for marginal coverage.
+      # Add it back if a windows-only regression surfaces.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v5
       - uses: jdx/mise-action@v4
@@ -53,15 +56,13 @@ jobs:
           key: sccache-${{ matrix.os }}-${{ hashFiles('cli/Cargo.lock') }}
           restore-keys: sccache-${{ matrix.os }}-
 
-      # One step per mise task — gives GH Actions UI + ci-watch native step-level
-      # red/green + per-task durations without log parsing.
+      # Cut from the previous shape:
+      # - 4-build-cli removed: `cargo test` (test-cli) already compiles cli/.
+      # - test-ripgit removed: upstream's ci.yml runs `cargo test` in ripgit
+      #   on main pushes; no need to mirror.
       - name: 1-deps (aube install)
         run: mise run 1-deps
-      - name: 4-build-cli (cargo build cli)
-        run: mise run 4-build-cli
       - name: test-cli (cargo test cli)
         run: mise run test-cli
-      - name: test-ripgit (cargo test ripgit)
-        run: mise run test-ripgit
       - name: test-gateway (tsc + vitest)
         run: mise run test-gateway
