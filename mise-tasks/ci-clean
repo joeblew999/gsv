@@ -1,0 +1,83 @@
+#!/usr/bin/env nu
+#MISE description="Delete CI runs (default: only failed/cancelled; use --all to nuke every run, --keep-latest to keep the most recent successful)"
+
+const REPO = "joeblew999/gsv"
+const WORKFLOW = "mise.yml"
+
+def gh-token [] {
+  let env_tok = ($env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default ""))
+  if ($env_tok | is-not-empty) { return $env_tok }
+  try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
+}
+
+def main [
+  --all                      # delete every run, including successes (DESTRUCTIVE)
+  --branch (-b): string      # only this branch (default: any)
+  --workflow (-w): string    # workflow file name (default: mise.yml)
+  --limit (-l): int = 200    # max runs to consider per call
+  --keep-latest              # keep the latest successful run on the branch
+  --dry-run                  # list what would be deleted without deleting
+] {
+  let token = (gh-token)
+  if ($token | is-empty) {
+    print --stderr "✗ no GitHub token: set GH_TOKEN, GITHUB_TOKEN, or fnox set GITHUB_TOKEN"
+    exit 1
+  }
+  let wf = ($workflow | default $WORKFLOW)
+  let base_args = ["run" "list" "--workflow" $wf "--limit" ($limit | into string) "--repo" $REPO "--json" "databaseId,conclusion,status,headBranch,createdAt"]
+  let args = if $branch != null { $base_args | append ["--branch" $branch] } else { $base_args }
+  let runs = (with-env {GH_TOKEN: $token} { ^gh ...$args } | from json)
+  if ($runs | length) == 0 {
+    print "no runs found"
+    return
+  }
+
+  # Decide which to delete
+  let candidates = if $all {
+    if $keep_latest {
+      # keep the newest success on each branch
+      let keepers = (
+        $runs
+        | where conclusion == "success"
+        | sort-by createdAt -r
+        | group-by headBranch
+        | values
+        | each { |g| $g | first | get databaseId }
+      )
+      $runs | where { |r| not ($r.databaseId in $keepers) }
+    } else {
+      $runs
+    }
+  } else {
+    $runs | where { |r| $r.conclusion == "failure" or $r.conclusion == "cancelled" or $r.status != "completed" }
+  }
+
+  if ($candidates | length) == 0 {
+    print "✓ nothing to delete"
+    return
+  }
+
+  print $"target: ($wf) on ($REPO)"
+  print $"found ($candidates | length) run\(s\) to delete:"
+  for r in $candidates {
+    print $"  ($r.databaseId)  ($r.headBranch)  ($r.status):($r.conclusion | default '')"
+  }
+
+  if $dry_run {
+    print ""
+    print "(dry-run — no deletes)"
+    return
+  }
+
+  print ""
+  for r in $candidates {
+    let res = (with-env {GH_TOKEN: $token} { do { ^gh run delete ($r.databaseId | into string) --repo $REPO } | complete })
+    if $res.exit_code == 0 {
+      print $"✓ deleted ($r.databaseId)"
+    } else {
+      print --stderr $"✗ failed to delete ($r.databaseId): ($res.stderr | default $res.stdout)"
+    }
+  }
+  print ""
+  print $"done — deleted ($candidates | length) run\(s\)"
+}

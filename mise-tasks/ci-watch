@@ -1,0 +1,125 @@
+#!/usr/bin/env nu
+#MISE description="Watch the latest Mise CI run on this branch — streams per-job transitions, dumps failed-step log via gh api"
+
+# Polls run + per-job status every 20s, prints transitions only (not noise).
+# Fetches a failed job's log via gh api as soon as the job completes — works
+# mid-run, unlike `gh run view --log` which waits for the whole run.
+
+const REPO = "joeblew999/gsv"
+const WORKFLOW = "mise.yml"
+
+def gh-token [] {
+  let env_tok = ($env.GH_TOKEN? | default ($env.GITHUB_TOKEN? | default ""))
+  if ($env_tok | is-not-empty) { return $env_tok }
+  try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
+}
+
+def main [
+  --run-id (-r): int            # specific run id; default = latest on current branch
+  --branch (-b): string = "joeblew999"
+  --interval (-i): int = 20      # seconds between polls
+] {
+  let token = (gh-token)
+  if ($token | is-empty) {
+    print --stderr "✗ no GitHub token: set GH_TOKEN, GITHUB_TOKEN, or fnox set GITHUB_TOKEN"
+    exit 1
+  }
+
+  let id = if $run_id != null {
+    $run_id
+  } else {
+    let latest = (with-env {GH_TOKEN: $token} { ^gh run list --workflow $WORKFLOW --branch $branch --limit 1 --repo $REPO --json databaseId } | from json)
+    if ($latest | length) == 0 {
+      print --stderr $"✗ no runs found for ($WORKFLOW) on ($branch)"
+      exit 1
+    }
+    ($latest | first | get databaseId)
+  }
+
+  print $"watching run ($id) on ($REPO)"
+  mut seen = {}
+  mut failed_jobs = []
+
+  loop {
+    let detail = (with-env {GH_TOKEN: $token} { ^gh run view $id --repo $REPO --json status,conclusion,jobs } | from json)
+    let run_status = $detail.status
+    let run_conclusion = ($detail.conclusion | default "")
+
+    # Print transitions per job
+    for j in $detail.jobs {
+      let job_id = ($j.databaseId | into string)
+      let cur = $"($j.status):($j.conclusion | default '')"
+      let prev = ($seen | get --optional $job_id | default "")
+      if $cur != $prev {
+        let mark = if $j.conclusion == "success" {
+          "✓"
+        } else if $j.conclusion == "failure" {
+          "✗"
+        } else if $j.conclusion == "cancelled" {
+          "⊘"
+        } else {
+          "·"
+        }
+        print $"  ($mark) ($j.name)  ($cur)"
+        $seen = ($seen | upsert $job_id $cur)
+
+        if $j.conclusion == "failure" and not ($job_id in $failed_jobs) {
+          $failed_jobs = ($failed_jobs | append $job_id)
+        }
+      }
+    }
+
+    if $run_status == "completed" {
+      print ""
+      print $"run ($id) → ($run_conclusion)"
+      break
+    }
+    sleep ($interval * 1sec)
+  }
+
+  # Dump failed-step logs
+  if ($failed_jobs | length) > 0 {
+    print ""
+    print "=== failed-job logs ==="
+    for jid in $failed_jobs {
+      print ""
+      print $"--- job ($jid) ---"
+      let log = (with-env {GH_TOKEN: $token} { do { ^gh api $"repos/($REPO)/actions/jobs/($jid)/logs" } | complete })
+      let body = ($log.stdout | default "")
+      # Find lines that look like real failures (compiler error, test fail,
+      # nu error, npm/aube error, "ERROR task failed" from mise) and print
+      # 5 lines of context around each. If nothing matches, fall back to
+      # last 40 lines.
+      let lines = ($body | lines)
+      let markers = [
+        "task failed"
+        "Error: nu::"
+        "TypeError"
+        "AssertionError"
+        "##[error]"
+        "FAIL "
+        "error TS"
+        "error: "
+        "ERROR ["
+      ]
+      let hits = (
+        $lines
+        | enumerate
+        | where { |row| $markers | any { |m| ($row.item | str contains $m) } }
+        | get index
+      )
+      if ($hits | length) > 0 {
+        let printed = ($hits | each { |i|
+          let lo = if $i > 5 { $i - 5 } else { 0 }
+          let hi = if ($i + 3) < ($lines | length) { $i + 3 } else { ($lines | length) - 1 }
+          $lines | range $lo..$hi | str join "\n"
+        })
+        print ($printed | str join "\n  ---\n")
+      } else {
+        print "(no clear error markers; tail 40)"
+        print ($lines | last 40 | str join "\n")
+      }
+    }
+    exit 1
+  }
+}
