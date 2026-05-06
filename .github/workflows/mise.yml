@@ -2,7 +2,7 @@ name: Mise
 
 on:
   push:
-    branches: [main, joeblew999]
+    branches: [joeblew999]
   pull_request:
     branches: [main]
   workflow_dispatch:
