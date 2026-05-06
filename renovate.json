@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeMinor"
+  ],
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies", "automated"],
+  "mise": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group all mise tool bumps into one PR",
+      "matchManagers": ["mise"],
+      "groupName": "mise tools"
+    },
+    {
+      "description": "Pin Rust toolchain conservatively (major Rust bumps need a manual review)",
+      "matchManagers": ["mise"],
+      "matchPackageNames": ["rust"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}

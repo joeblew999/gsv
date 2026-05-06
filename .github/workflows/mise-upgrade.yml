@@ -1,0 +1,50 @@
+name: Mise upgrade
+
+on:
+  # Weekly on Monday 09:00 UTC. workflow_dispatch lets you trigger manually
+  # any time via:  gh workflow run mise-upgrade.yml --ref joeblew999
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  upgrade:
+    name: Upgrade pinned tools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.5.1
+          install: false  # we don't need the tools, just mise itself
+
+      # `mise upgrade --bump` upgrades tool versions in mise.toml to the latest
+      # within each pin's range. With --bump it also rewrites the pin to the
+      # newer major when applicable (e.g. node 24 → 25).
+      - name: Bump tool versions
+        run: |
+          mise upgrade --bump
+          git diff -- mise.toml || true
+
+      - name: Open PR if mise.toml changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore(mise): bump pinned tool versions"
+          branch: mise-upgrade
+          delete-branch: true
+          title: "chore(mise): bump pinned tool versions"
+          body: |
+            Automated weekly bump produced by `.github/workflows/mise-upgrade.yml`.
+
+            Diff is whatever `mise upgrade --bump` produced for `mise.toml`.
+
+            CI will run automatically on push to this branch. Review the diff,
+            merge if green; close + ignore if any pin should stay where it is
+            (mise reads `[tools.<name>.exclude]` and similar to skip).
+          add-paths: mise.toml
+          labels: dependencies, automated
