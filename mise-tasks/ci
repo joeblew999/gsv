@@ -1,0 +1,7 @@
+#!/usr/bin/env nu
+#MISE description="CI bundle: parse-check + version-check + build-cli + test-cli (run by Mise workflow)"
+#MISE depends=["ci-parse-check", "version-check", "4-build-cli", "test-cli"]
+
+def main [] {
+  print "✓ ci checks passed"
+}

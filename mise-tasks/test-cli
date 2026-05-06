@@ -1,0 +1,10 @@
+#!/usr/bin/env nu
+#MISE description="Run gsv CLI unit tests (cargo test, in cli/)"
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  cd $"($REPO_ROOT)/cli"
+  ^cargo test
+}

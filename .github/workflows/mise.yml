@@ -36,3 +36,24 @@ jobs:
 
       - name: Parse-check every nu task file
         run: mise run ci-parse-check
+
+  validate:
+    name: Validate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: parse-check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          version: 2026.5.1
+          install: true
+          cache: true
+
+      - name: Run mise CI bundle (version-check + build-cli + test-cli)
+        run: mise run ci
