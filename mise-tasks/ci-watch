@@ -14,6 +14,20 @@ def gh-token [] {
   try { ^fnox get GITHUB_TOKEN | str trim } catch { "" }
 }
 
+# Duration of a job: completed → completedAt-startedAt, in-progress → now-startedAt,
+# queued → "—". Returns a short string like "2m 15s".
+def job-duration [j: any, now: datetime] {
+  let started = ($j.startedAt? | default "")
+  if ($started | is-empty) { return "—" }
+  let s = ($started | into datetime)
+  let end = if ($j.status == "completed") {
+    ($j.completedAt? | default "" | into datetime)
+  } else {
+    $now
+  }
+  ($end - $s) | format duration sec
+}
+
 def main [
   --run-id (-r): int            # specific run id; default = latest on current branch
   --branch (-b): string = "joeblew999"
@@ -36,7 +50,8 @@ def main [
     ($latest | first | get databaseId)
   }
 
-  print $"watching run ($id) on ($REPO)"
+  let started = (date now)
+  print $"watching run ($id) on ($REPO)  \(started ($started | format date '%H:%M:%S')\)"
   mut seen = {}
   mut failed_jobs = []
 
@@ -44,6 +59,7 @@ def main [
     let detail = (with-env {GH_TOKEN: $token} { ^gh run view $id --repo $REPO --json status,conclusion,jobs } | from json)
     let run_status = $detail.status
     let run_conclusion = ($detail.conclusion | default "")
+    let now = (date now)
 
     # Print transitions per job
     for j in $detail.jobs {
@@ -57,10 +73,13 @@ def main [
           "✗"
         } else if $j.conclusion == "cancelled" {
           "⊘"
+        } else if $j.status == "in_progress" {
+          "▶"
         } else {
           "·"
         }
-        print $"  ($mark) ($j.name)  ($cur)"
+        let dur = (job-duration $j $now)
+        print $"  ($mark) ($j.name | fill -w 30 -a l) ($cur | fill -w 22 -a l) ($dur)"
         $seen = ($seen | upsert $job_id $cur)
 
         if $j.conclusion == "failure" and not ($job_id in $failed_jobs) {
@@ -70,10 +89,20 @@ def main [
     }
 
     if $run_status == "completed" {
+      let total = (((date now) - $started) | format duration sec)
       print ""
-      print $"run ($id) → ($run_conclusion)"
+      print $"run ($id) → ($run_conclusion)  \(watcher ran ($total)\)"
       break
     }
+
+    # Heartbeat: show in-progress job durations every poll
+    let in_prog = ($detail.jobs | where { |j| $j.status == "in_progress" })
+    if ($in_prog | length) > 0 {
+      let elapsed = ((($now - $started) | format duration sec))
+      let summary = ($in_prog | each { |j| $"($j.name) [(job-duration $j $now)]" } | str join "  ")
+      print $"  · \(elapsed ($elapsed)\) running: ($summary)"
+    }
+
     sleep ($interval * 1sec)
   }
 
