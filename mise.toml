@@ -1,0 +1,48 @@
+[task_config]
+# Order matters: local `mise-tasks/` first so our numbered file tasks are
+# discovered. Setting `includes` disables mise's default auto-discovery, so we
+# list both explicitly. Shared joeblew999 task library provides cf:*, secrets:*,
+# wrangler:*, fnox:* etc.
+includes = [
+  "mise-tasks",
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.10.0",
+]
+
+[tools]
+# Pins required by the shared library at v0.10.0 (every shared task is nu).
+"github:nushell/nushell" = "0.112"
+"github:jdx/fnox"        = "1.23"
+"github:cli/cli"         = "2"      # gh CLI — github backend works (tags are v<semver>)
+"aqua:jqlang/jq"         = "1"      # jq — tags are `jq-1.7.x`, github backend mis-parses, aqua maps it correctly
+
+# gsv-specific toolchain (matches existing CI: Node 24, Rust stable + wasm32 target).
+node = "24"
+rust = { version = "stable", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
+# zig provides `zig cc` for cross-compiling C code to wasm32 (used by ripgit's
+# zstd dep via ripgit/scripts/wasm-cc). Apple clang doesn't ship wasm targets.
+zig = "0.13"
+# pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
+"github:endevco/pitchfork" = "2.10.0"
+# Pre-installed so the parallel rust-worker build hooks (ripgit + assembler)
+# don't both call `cargo install worker-build` and contend on cargo's package
+# cache lock. Required for upstream's scripts/worker-build.sh.
+"cargo:worker-build" = "0.7"
+
+[env]
+CARGO_TERM_COLOR = "always"
+
+# Add project-local shims dir to PATH (no-op flock for macOS where util-linux's
+# flock isn't available, plus zig-cc target translator).
+_.path = [".mise-bin"]
+
+# Force ripgit's wasm-cc shim to use `zig cc` instead of Apple's clang. Apple clang
+# doesn't ship a wasm32-unknown-unknown target; zig does.
+RIPGIT_WASM_CC = "{{config_root}}/.mise-bin/zig-cc"
+# Same for cargo's `cc` crate (used by zstd-sys for build.rs C compilation).
+CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc"
+
+# Which fnox keys get synced to GitHub Actions secrets via `mise run secrets:sync-github`.
+FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,CF_API_TOKEN,CF_ACCOUNT_ID"
+
+# All tasks live in mise-tasks/ as nushell file tasks (with `#MISE description=`
+# and `#MISE depends=[...]` headers). Run `mise tasks ls` to see them.

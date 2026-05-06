@@ -1,0 +1,10 @@
+#!/usr/bin/env nu
+#MISE description="Run gsv device daemon in foreground (called BY pitchfork — don't invoke directly; use 10-up-device)"
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  let gsv = $"($REPO_ROOT)/cli/target/release/gsv"
+  ^$gsv device run --id macbook --workspace $env.HOME
+}

@@ -1,0 +1,44 @@
+# Pitchfork daemon orchestration for GSV.
+#
+# Long-lived processes (the dev stack, the device daemon, future http-nu) are
+# managed here. One-shot tasks (build, deploy, probes) stay in mise.toml.
+#
+# Usage:
+#   mise run up        # start the daemon tree
+#   mise run down      # stop it
+#   mise run status    # show what's running
+#
+# Or directly:
+#   pitchfork start dev-stack
+#   pitchfork stop device
+#   pitchfork tail dev-stack
+
+[settings.general]
+mise = true
+
+[daemons.dev-stack]
+run = "mise run dev"
+# wrangler dev's first-build of the rust workers can exceed 63s on macOS (zig
+# wasm cross-compile + parallel cargo lock contention). pitchfork's ready_http
+# check times out before the gateway starts serving HTTP. Using ready_delay
+# instead — pitchfork just confirms the process didn't crash on launch; the
+# 5-onboard-local task does the real "is it serving?" check via curl.
+ready_delay = 5
+retry = true
+auto = ["start", "stop"]
+
+# The device daemon connects this machine to a gateway. Requires onboarding +
+# `gsv config --local set node.id/node.token/gateway.url` first; otherwise it
+# crashloops. Not in `auto` — start explicitly with `pitchfork start device`.
+[daemons.device]
+run = "mise run device-run"
+ready_delay = 3
+retry = true
+
+# Phase 2 (ADR 0003) — uncomment once http-nu is wired in
+# [daemons.http-nu]
+# run = "mise run httpnu:run"
+# depends = ["device"]
+# ready_http = "http://localhost:7777"
+# retry = true
+# auto = ["start", "stop"]

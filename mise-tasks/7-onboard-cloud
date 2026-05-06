@@ -1,0 +1,44 @@
+#!/usr/bin/env nu
+#MISE description="Step 7 — onboard the CLOUD gateway non-interactively (idempotent; uses fnox-stored password)"
+#MISE depends=["4-build-cli", "6-deploy-cloud"]
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def ensure-password [] {
+  let existing = (try { ^fnox get GSV_PASSWORD | str trim } catch { "" })
+  if ($existing | is-not-empty) {
+    return $existing
+  }
+  let pw = (random chars --length 32)
+  print --stderr "→ no GSV_PASSWORD in fnox; generating one..."
+  $pw | ^fnox set --provider keychain GSV_PASSWORD
+  print --stderr "✓ saved GSV_PASSWORD to fnox keychain"
+  $pw
+}
+
+def main [] {
+  let pw = (ensure-password)
+  let gsv = $"($REPO_ROOT)/cli/target/release/gsv"
+  if not ($gsv | path exists) {
+    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli`"
+    exit 1
+  }
+
+  # The cloud gateway URL — read from gsv's local config if set, else default.
+  let cfg_url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
+  let url = if ($cfg_url | is-not-empty) { $cfg_url } else { "wss://gsv.gedw99.workers.dev/ws" }
+
+  print $"→ onboarding ($url)..."
+  let result = (do { ^$gsv --url $url auth setup --username joe --new-password $pw --node-id macbook --node-label macbook } | complete)
+
+  if $result.exit_code == 0 {
+    print $"✓ cloud onboarded \(($url)\)"
+  } else if (($result.stderr | default "") | str contains "setup mode") {
+    print $"✓ cloud already onboarded \(($url)\) — skipping"
+  } else {
+    print --stderr "✗ cloud onboard failed:"
+    print --stderr ($result.stderr | default $result.stdout)
+    exit 1
+  }
+}

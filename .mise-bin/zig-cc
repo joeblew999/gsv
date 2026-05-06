@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# zig cc wrapper that translates Rust/LLVM target strings to zig target strings.
+# Used as RIPGIT_WASM_CC and CC_wasm32_unknown_unknown so cargo's cc-rs invokes us
+# instead of Apple clang (no wasm32 target) when compiling C deps for wasm32.
+#
+# Translation: --target=wasm32-unknown-unknown → --target=wasm32-freestanding
+# (Rust calls it `unknown-unknown`; zig calls it `freestanding`.)
+
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    --target=wasm32-unknown-unknown)
+      args+=("--target=wasm32-freestanding")
+      ;;
+    --target=wasm32-wasi)
+      args+=("--target=wasm32-wasi")
+      ;;
+    *)
+      args+=("$arg")
+      ;;
+  esac
+done
+
+exec zig cc "${args[@]}"

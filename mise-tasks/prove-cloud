@@ -1,0 +1,22 @@
+#!/usr/bin/env nu
+#MISE description="Probe the deployed CF gateway — reads URL from local gsv config"
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  let gsv = $"($REPO_ROOT)/cli/target/release/gsv"
+  let ws_url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
+  if ($ws_url | is-empty) {
+    print --stderr "✗ gateway.url not set in local config — run gsv config --local set gateway.url ws://..."
+    exit 1
+  }
+  let http_url = ($ws_url | str replace --regex '^ws' 'http' | str replace --regex '/ws$' '')
+  let ok = (try { ^curl --max-time 10 -fsS -o /dev/null $"($http_url)/"; true } catch { false })
+  if $ok {
+    print $"✓ cloud gateway responding at ($http_url)"
+  } else {
+    print --stderr $"✗ cloud gateway not responding at ($http_url)"
+    exit 1
+  }
+}

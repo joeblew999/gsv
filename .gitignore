@@ -9,3 +9,14 @@ docs/.vitepress/cache/
 
 # Alchemy state
 .alchemy/
+
+# Reference clones (third-party source we read; never committed)
+.src/
+
+# Local-only working state
+# claude-code session state
+.claude/
+# local fnox config (machine-specific keychain pointers, no secrets)
+fnox.toml
+# build artifacts from build-bundles
+release/

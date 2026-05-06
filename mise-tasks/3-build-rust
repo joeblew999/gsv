@@ -1,0 +1,31 @@
+#!/usr/bin/env nu
+#MISE description="Step 3 — build the Rust workers (assembler + ripgit) sequentially. Bypasses wrangler's parallel build hooks to avoid cargo cache lock contention."
+
+# Why this exists: wrangler dev's [build].command hooks fire in parallel, and
+# without serialisation the two `cargo build` calls fight over cargo's package
+# cache lock (the bash version uses `flock` to prevent this). By pre-building
+# sequentially via mise, we sidestep wrangler's parallelism — when it does run
+# its [build] hooks, the artefacts are already fresh and the work is a no-op.
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+const CRATES = ["assembler", "ripgit"]
+
+def main [] {
+  if (which worker-build | is-empty) {
+    print --stderr "✗ worker-build not on PATH — run `mise install` (mise.toml pins cargo:worker-build)"
+    exit 1
+  }
+
+  for crate in $CRATES {
+    let crate_dir = $"($REPO_ROOT)/($crate)"
+    print $"→ building ($crate)..."
+    cd $crate_dir
+    ^worker-build --release .
+    print $"  ✓ ($crate) built"
+  }
+
+  print ""
+  print "✓ rust workers ready"
+}

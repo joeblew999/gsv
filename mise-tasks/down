@@ -1,0 +1,6 @@
+#!/usr/bin/env nu
+#MISE description="Stop all local pitchfork-managed daemons (dev-stack, device, ...)"
+
+def main [] {
+  ^pitchfork stop --local
+}

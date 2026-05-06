@@ -1,0 +1,12 @@
+#!/usr/bin/env nu
+#MISE description="Bring up the FULL system (cloud + local + device)"
+#MISE depends=["system-cloud", "system-local", "10-up-device"]
+
+def main [] {
+  print "✓ full system up"
+  print "  cloud:   https://gsv.gedw99.workers.dev"
+  print "  local:   http://localhost:8787"
+  print "  device:  connected (see ~/.gsv/logs/node.log)"
+  print ""
+  print "  password: fnox get GSV_PASSWORD"
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env nu
+#MISE description="Step 1 — install JS deps across the workspace, adapters, and ripgit"
+
+# Loops over adapters/* and runs `npm ci` per directory plus the workspace root
+# and ripgit. Replaces the bash setup-deps.sh by orchestrating the same npm
+# calls in nu — we don't touch the bash script (it stays in scripts/).
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  print "→ workspace install..."
+  cd $REPO_ROOT
+  ^npm install
+
+  print ""
+  print "→ adapter installs..."
+  glob $"($REPO_ROOT)/adapters/*"
+    | where { |p| ($p | path join package.json | path exists) }
+    | each { |p|
+        print $"  ($p | path basename)"
+        ^npm ci --prefix $p --workspaces=false
+      }
+
+  print ""
+  print "→ ripgit install..."
+  ^npm ci --prefix $"($REPO_ROOT)/ripgit" --workspaces=false
+
+  print ""
+  print "✓ all JS deps installed"
+}

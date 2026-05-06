@@ -1,0 +1,12 @@
+#!/usr/bin/env nu
+#MISE description="Probe the local dev stack — expect 200 from http://localhost:8787"
+
+def main [] {
+  let result = (try { ^curl --max-time 5 -fsS -o /dev/null http://localhost:8787/; true } catch { false })
+  if $result {
+    print "✓ local gateway responding on http://localhost:8787"
+  } else {
+    print --stderr "✗ local gateway not responding on http://localhost:8787"
+    exit 1
+  }
+}

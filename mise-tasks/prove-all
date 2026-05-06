@@ -1,0 +1,7 @@
+#!/usr/bin/env nu
+#MISE description="Run every probe (CF token, local stack, cloud gateway, device daemon)"
+#MISE depends=["cf:token-check", "prove-local", "prove-cloud", "prove-device"]
+
+def main [] {
+  print "✓ all probes passed"
+}

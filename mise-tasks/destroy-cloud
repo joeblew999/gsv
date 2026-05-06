@@ -1,0 +1,15 @@
+#!/usr/bin/env nu
+#MISE description="Tear down GSV infra from Cloudflare (reversible — re-run infra-deploy to redeploy)"
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [] {
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let gsv = $"($REPO_ROOT)/cli/target/release/gsv"
+  with-env {CF_API_TOKEN: $token, CF_ACCOUNT_ID: $account} {
+    cd $REPO_ROOT
+    ^$gsv infra destroy
+  }
+}

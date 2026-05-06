@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# No-op flock shim for macOS, where util-linux's flock isn't installed by default.
+# Used by scripts/worker-build.sh:21 to serialise concurrent `cargo install worker-build`.
+# cargo install is idempotent enough that the missing lock is acceptable for local dev.
+# If real flock is installed later (e.g. brew install util-linux), it will take precedence
+# in PATH if its directory comes before .mise-bin.
+exit 0
