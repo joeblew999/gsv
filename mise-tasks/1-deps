@@ -23,7 +23,10 @@ def main [] {
 
   print ""
   print "→ adapter installs..."
-  glob $"($REPO_ROOT)/adapters/*"
+  # Normalize to forward slashes so glob works cross-platform — `path self`
+  # on Windows produces backslashes which nu's glob parser rejects.
+  let adapters_glob = ($REPO_ROOT | str replace --all '\' '/' | path join "adapters" "*")
+  glob $adapters_glob
     | where { |p| ($p | path join package.json | path exists) }
     | each { |p|
         print $"  ($p | path basename)"

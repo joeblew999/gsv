@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 #MISE description="Step 4 — build the gsv Rust CLI in release mode (needed for deploy/onboard/device)"
-#MISE depends=["1-deps"]
+# No depends — cli/ is pure cargo, doesn't need npm deps from 1-deps.
 
 const SCRIPT_PATH = (path self)
 const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
