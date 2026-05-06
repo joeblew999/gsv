@@ -11,6 +11,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# SSOT: each job runs ONE mise task. The task's own `#MISE depends=[...]`
+# header fans out the work. To change what CI does, edit the task — never
+# enumerate steps here.
+
 jobs:
   parse-check:
     name: Parse-check (${{ matrix.os }})
@@ -26,8 +30,7 @@ jobs:
           version: 2026.5.1
           install: true
           cache: true
-      - name: Parse-check nu task files
-        run: mise run ci-parse-check
+      - run: mise run ci-parse-check
 
   validate:
     name: Validate (${{ matrix.os }})
@@ -35,9 +38,8 @@ jobs:
     needs: parse-check
     strategy:
       fail-fast: false
-      # Skipping windows-latest — its parse-check already passed; windows
-      # cargo+vitest is 2-3× slower than linux/macos for marginal coverage.
-      # Add it back if a windows-only regression surfaces.
+      # Windows skipped — slow + parse-check already covers it.
+      # Add back if a windows-only regression surfaces.
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
@@ -47,22 +49,9 @@ jobs:
           version: 2026.5.1
           install: true
           cache: true
-
-      # sccache cache directory — same path locally and in CI; mise wires
-      # RUSTC_WRAPPER=sccache so cargo invokes it automatically.
       - uses: actions/cache@v4
         with:
           path: ~/.cache/sccache
           key: sccache-${{ matrix.os }}-${{ hashFiles('cli/Cargo.lock') }}
           restore-keys: sccache-${{ matrix.os }}-
-
-      # Cut from the previous shape:
-      # - 4-build-cli removed: `cargo test` (test-cli) already compiles cli/.
-      # - test-ripgit removed: upstream's ci.yml runs `cargo test` in ripgit
-      #   on main pushes; no need to mirror.
-      - name: 1-deps (aube install)
-        run: mise run 1-deps
-      - name: test-cli (cargo test cli)
-        run: mise run test-cli
-      - name: test-gateway (tsc + vitest)
-        run: mise run test-gateway
+      - run: mise run ci
