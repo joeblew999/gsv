@@ -30,6 +30,10 @@ jobs:
           version: 2026.5.1
           install: true
           cache: true
+          # Workaround for jdx/mise-action#382 — default cache key has
+          # prefix-match collisions + missing return-on-hit. Custom key
+          # keyed on (job, os, mise.toml hash) dodges both bugs.
+          cache_key: mise-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
       - run: mise run ci-parse-check
 
   validate:
@@ -49,6 +53,10 @@ jobs:
           version: 2026.5.1
           install: true
           cache: true
+          # Workaround for jdx/mise-action#382 — default cache key has
+          # prefix-match collisions + missing return-on-hit. Custom key
+          # keyed on (job, os, mise.toml hash) dodges both bugs.
+          cache_key: mise-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
       - uses: actions/cache@v4
         with:
           path: ~/.cache/sccache
