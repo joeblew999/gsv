@@ -1,10 +1,12 @@
 #!/usr/bin/env nu
-#MISE description="Full CI: parse-check + cli build/test + gateway tests + ripgit tests"
-#MISE depends=["ci-parse-check", "4-build-cli", "test-cli", "test-gateway", "test-ripgit"]
+#MISE description="CI: parse-check + cli tests + gateway tests"
+#MISE depends=["ci-parse-check", "test-cli", "test-gateway"]
 
-# Mirrors what upstream's ci.yml validates that's actually
-# cross-platform-meaningful — drops only the wrangler --dry-run bundle jobs
-# (those are heavy and covered by upstream's own CI on main).
+# SSOT for what CI runs. Workflow file just calls `mise run ci` — to change
+# what CI does, edit this depends list. Trimmed from the previous shape:
+# - 4-build-cli dropped (`cargo test` in test-cli already compiles cli/)
+# - test-ripgit dropped (upstream's ci.yml runs cargo test in ripgit on main
+#   pushes; no value mirroring)
 
 def main [] {
   print "✓ all CI checks passed"
