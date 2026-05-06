@@ -15,14 +15,17 @@ def main [
 
   let before = (open --raw mise.toml)
 
+  # --local restricts to this project's mise.toml — without it mise also
+  # bumps tools from the global ~/.config/mise/config.toml (your other
+  # projects' tools leak in: ruby, java, http:ifc-lite-server, etc.)
   if $dry_run {
-    print "→ mise upgrade --bump --dry-run"
-    ^mise upgrade --bump --dry-run
+    print "→ mise upgrade --bump --local --dry-run"
+    ^mise upgrade --bump --local --dry-run
     return
   }
 
-  print "→ mise upgrade --bump"
-  ^mise upgrade --bump
+  print "→ mise upgrade --bump --local"
+  ^mise upgrade --bump --local
 
   let after = (open --raw mise.toml)
   if $before == $after {
