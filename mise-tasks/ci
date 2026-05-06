@@ -1,6 +1,10 @@
 #!/usr/bin/env nu
-#MISE description="CI bundle: parse-check + version-check + build-cli + test-cli (run by Mise workflow)"
-#MISE depends=["ci-parse-check", "version-check", "4-build-cli", "test-cli"]
+#MISE description="CI bundle: parse-check + build-cli + test-cli (run by Mise workflow)"
+#MISE depends=["ci-parse-check", "4-build-cli", "test-cli"]
+
+# Version sync check is intentionally NOT here — it lives in upstream's ci.yml
+# (which runs on main, where versions actually get bumped). Our branch
+# doesn't change versions, so checking it on every CI run adds no value.
 
 def main [] {
   print "✓ ci checks passed"
