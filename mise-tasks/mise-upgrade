@@ -1,0 +1,36 @@
+#!/usr/bin/env nu
+#MISE description="Bump pinned tool versions in mise.toml via `mise upgrade --bump`. Idempotent — exit 0 with no diff when nothing's stale."
+
+# Same task drives both local upgrades (`mise run mise-upgrade`) and the
+# scheduled CI workflow (.github/workflows/mise-upgrade.yml). Single source
+# of truth — if you can run it locally, CI runs the same thing.
+
+const SCRIPT_PATH = (path self)
+const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+
+def main [
+  --dry-run          # show what would change without writing
+] {
+  cd $REPO_ROOT
+
+  let before = (open --raw mise.toml)
+
+  if $dry_run {
+    print "→ mise upgrade --bump --dry-run"
+    ^mise upgrade --bump --dry-run
+    return
+  }
+
+  print "→ mise upgrade --bump"
+  ^mise upgrade --bump
+
+  let after = (open --raw mise.toml)
+  if $before == $after {
+    print "✓ nothing to upgrade — mise.toml unchanged"
+    return
+  }
+
+  print ""
+  print "✓ mise.toml bumped:"
+  ^git --no-pager diff -- mise.toml
+}
