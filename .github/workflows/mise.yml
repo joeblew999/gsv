@@ -26,7 +26,8 @@ jobs:
           version: 2026.5.1
           install: true
           cache: true
-      - run: mise run ci-parse-check
+      - name: Parse-check nu task files
+        run: mise run ci-parse-check
 
   validate:
     name: Validate (${{ matrix.os }})
@@ -52,4 +53,15 @@ jobs:
           key: sccache-${{ matrix.os }}-${{ hashFiles('cli/Cargo.lock') }}
           restore-keys: sccache-${{ matrix.os }}-
 
-      - run: mise run ci
+      # One step per mise task — gives GH Actions UI + ci-watch native step-level
+      # red/green + per-task durations without log parsing.
+      - name: 1-deps (aube install)
+        run: mise run 1-deps
+      - name: 4-build-cli (cargo build cli)
+        run: mise run 4-build-cli
+      - name: test-cli (cargo test cli)
+        run: mise run test-cli
+      - name: test-ripgit (cargo test ripgit)
+        run: mise run test-ripgit
+      - name: test-gateway (tsc + vitest)
+        run: mise run test-gateway

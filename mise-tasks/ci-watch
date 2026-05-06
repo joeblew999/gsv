@@ -28,6 +28,34 @@ def job-duration [j: any, now: datetime] {
   ($end - $s) | format duration sec
 }
 
+def step-duration [s: any, now: datetime] {
+  let started = ($s.startedAt? | default "")
+  if ($started | is-empty) { return "—" }
+  let st = ($started | into datetime)
+  let end = if ($s.status == "completed") {
+    ($s.completedAt? | default "" | into datetime)
+  } else {
+    $now
+  }
+  ($end - $st) | format duration sec
+}
+
+def status-mark [status: string, conclusion: string] {
+  if $conclusion == "success" {
+    "✓"
+  } else if $conclusion == "failure" {
+    "✗"
+  } else if $conclusion == "cancelled" {
+    "⊘"
+  } else if $conclusion == "skipped" {
+    "·"
+  } else if $status == "in_progress" {
+    "▶"
+  } else {
+    "·"
+  }
+}
+
 def main [
   --run-id (-r): int            # specific run id; default = latest on current branch
   --branch (-b): string = "joeblew999"
@@ -61,29 +89,37 @@ def main [
     let run_conclusion = ($detail.conclusion | default "")
     let now = (date now)
 
-    # Print transitions per job
+    # Print transitions per job + step
     for j in $detail.jobs {
       let job_id = ($j.databaseId | into string)
-      let cur = $"($j.status):($j.conclusion | default '')"
-      let prev = ($seen | get --optional $job_id | default "")
-      if $cur != $prev {
-        let mark = if $j.conclusion == "success" {
-          "✓"
-        } else if $j.conclusion == "failure" {
-          "✗"
-        } else if $j.conclusion == "cancelled" {
-          "⊘"
-        } else if $j.status == "in_progress" {
-          "▶"
-        } else {
-          "·"
-        }
+      let job_cur = $"($j.status):($j.conclusion | default '')"
+      let job_prev = ($seen | get --optional $job_id | default "")
+      if $job_cur != $job_prev {
+        let mark = (status-mark $j.status ($j.conclusion | default ""))
         let dur = (job-duration $j $now)
-        print $"  ($mark) ($j.name | fill -w 30 -a l) ($cur | fill -w 22 -a l) ($dur)"
-        $seen = ($seen | upsert $job_id $cur)
+        print $"  ($mark) ($j.name | fill -w 30 -a l) ($job_cur | fill -w 22 -a l) ($dur)"
+        $seen = ($seen | upsert $job_id $job_cur)
 
         if $j.conclusion == "failure" and not ($job_id in $failed_jobs) {
           $failed_jobs = ($failed_jobs | append $job_id)
+        }
+      }
+
+      # Step-level transitions (each YAML step shows up; skip the auto-injected
+      # "Set up job" / "Post" / "Complete job" noise unless they fail).
+      for s in ($j.steps | default []) {
+        let key = $"($job_id):($s.number)"
+        let s_cur = $"($s.status):($s.conclusion | default '')"
+        let s_prev = ($seen | get --optional $key | default "")
+        if $s_cur != $s_prev {
+          let is_failure = ($s.conclusion == "failure")
+          let is_meaningful = (not (($s.name | str starts-with "Set up") or ($s.name | str starts-with "Post ") or ($s.name | str starts-with "Complete job") or ($s.name == "Pre run") or ($s.name == "Run actions/checkout@v5")))
+          if $is_failure or ($is_meaningful and ($s.conclusion != null and $s.conclusion != "")) {
+            let mark = (status-mark $s.status ($s.conclusion | default ""))
+            let dur = (step-duration $s $now)
+            print $"      ($mark) ($s.name | fill -w 36 -a l) ($s_cur | fill -w 22 -a l) ($dur)  [($j.name)]"
+          }
+          $seen = ($seen | upsert $key $s_cur)
         }
       }
     }
