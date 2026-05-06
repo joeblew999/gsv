@@ -21,11 +21,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
+      # install: false → don't pull the full mise.toml [tools] set; we only
+      # need nushell for parse-checking the task files.
       - uses: jdx/mise-action@v4
         with:
           version: 2026.5.1
-          install: true
+          install: false
           cache: true
+      - run: mise install github:nushell/nushell
       - run: mise run ci-parse-check
 
   validate:
@@ -38,11 +41,15 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
+      # validate needs node (version-check), rust (build-cli, test-cli),
+      # nushell (driver), and sccache (cache rustc). Skip aube/zig/pitchfork/
+      # fnox/gh/jq — none of those are exercised by `mise run ci`.
       - uses: jdx/mise-action@v4
         with:
           version: 2026.5.1
-          install: true
+          install: false
           cache: true
+      - run: mise install github:nushell/nushell node rust github:mozilla/sccache
 
       # sccache cache directory — same path locally and in CI; mise wires
       # RUSTC_WRAPPER=sccache so cargo invokes it automatically.
