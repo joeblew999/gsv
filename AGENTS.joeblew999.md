@@ -45,12 +45,27 @@ Composites: `system-local` (1,2,3,4,8,9), `system-cloud` (1→7), `system-up` (e
 
 ## Tasks from the shared library (joeblew999/.github)
 
+gsv consumes these via TOML-task includes at `?ref=v0.16.0+` (see `mise.toml`).
+Per-task `tools = { ... }` propagates fnox/gh automatically — gsv doesn't pin
+them just because shared tasks need them.
+
 - **`mise run ci:parse-check`** — parse-check every nu file in `mise-tasks/`. Filters to files with nu shebang.
 - **`mise run ci:watch`** — streams per-job + per-step CI transitions; dumps failed-step logs via gh api.
 - **`mise run ci:clean`** — deletes failed/cancelled runs. `--all` to nuke; `--dry-run` to preview.
-- **`mise run mise:upgrade [--dry-run]`** — bumps `mise.toml` pins via `mise upgrade --bump --local`.
+- **`mise run cf:token-check`** — verify `CLOUDFLARE_API_TOKEN` is valid. Used by `6-deploy-cloud` and `prove-all` as a precondition.
+- **`mise run secrets:sync-github`** — push `FNOX_SYNC_KEYS` from fnox → GH Actions secrets.
 
-Plus all the existing namespaces: `cf:*`, `secrets:*`, `wrangler:*`, `bw:*`, `prove:*`, `mobile:*`, `rust:*`, `fnox:init`, `env:resolve`, `release`.
+**Other namespaces still on the legacy v0.10.0 directory include** (`mise-tasks` dir):
+`bw:*`, `wrangler:*`, `prove:*`, `mobile:*`, `rust:*`, `release`, `env:resolve`,
+`fnox:init`, `mise:upgrade`. Will be ported to TOML-tasks as needed. Currently
+gsv doesn't reference any of them — switch to v0.16.x TOML-task includes if
+gsv ever does.
+
+**Cross-repo audit commands** (mise tracks every config it has trusted):
+- **`mise config ls --tracked-configs`** — index of every mise.toml on this machine
+- **`mise outdated --all`** — diff every pinned tool against registry latest, across all configs
+- **`mise upgrade --bump --local`** — rewrite *current* config's pins to latest
+- ⚠ `?ref=vX.Y.Z` URLs in `task_config.includes` are NOT tools — `mise outdated` doesn't see them. Manual sweep until we ship `audit:lib-refs` upstream.
 
 ## Known gotchas — keep in mind
 
@@ -61,6 +76,8 @@ Plus all the existing namespaces: `cf:*`, `secrets:*`, `wrangler:*`, `bw:*`, `pr
 - **`RIPGIT_WASM_CC=zig-cc`** in `[env]` forces ripgit's `wasm-cc` shim to use zig instead of Apple clang (which has no wasm32 target).
 - **`mise upgrade --bump` without `--local`** leaks into your global `~/.config/mise/config.toml`. Always pass `--local` (the `mise:upgrade` task already does).
 - **Local `check` not `ci`** — bare `ci` would collide with the shared `ci:*` namespace; gsv's local CI bundle is named `check`.
+- **`test-gateway` skipped on Windows** — vitest-pool-workers + workerd hit a libuv crash during worker teardown on Windows (cloudflare/workers-sdk#5439, #7414, #10600). gsv's prod runtime is Linux Workers, so Windows coverage of those tests has limited value. Setup task body has a `$nu.os-info.name == "windows"` guard that returns early with a friendly message. Re-enable when workerd-on-Windows stabilises.
+- **1-deps Windows glob bug (fixed but easy to regress)** — nu's `path join` uses the platform separator. `($REPO_ROOT | str replace --all '\' '/' | path join "...")` produces mixed `D:/a/.../adapters\*` on Windows because `path join` re-adds `\`. Build glob patterns with string interpolation instead: `$"($REPO_ROOT)/adapters/*" | str replace --all '\' '/'`.
 
 ## Secrets
 
