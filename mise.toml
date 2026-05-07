@@ -1,73 +1,56 @@
+# Required for `extends = "<ns>:_base"` task inheritance (still flagged
+# experimental in mise; behaviour is stable, used by joeblew999/.github v0.18+).
 [settings]
-# extends task-inheritance is mise experimental — joeblew999/.github
-# v0.18+ uses it for per-namespace tools dedup (cf:_base, bw:_base, etc).
 experimental = true
 
 [task_config]
-# All gsv-local tasks live in tasks/<ns>.toml (TOML-tasks with extends-based
-# <ns>:_base for shared tools — same pattern as joeblew999/.github).
-# Shared library tasks come in via per-namespace `git::` URLs; per-task
-# `tools = { ... }` blocks propagate, so we don't pin gh/jq globally.
-#
-# Browseable URLs for the `git::` includes (drop `git::`, drop `.git`,
+# Browseable URLs for the shared lib (drop `git::`, drop `.git`,
 # swap `?ref=v…` for `/blob/v…/`):
 #   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/ci.toml
 #   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/cf.toml
 #   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/secrets.toml
 includes = [
-  # Local TOML-tasks (gsv-specific build/test/prove/system pipelines)
   "tasks/check.toml",
   "tasks/test.toml",
   "tasks/build.toml",
   "tasks/prove.toml",
   "tasks/system.toml",
-  # Shared lib (joeblew999/.github)
   "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.2",
   "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.2",
   "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.2",
 ]
 
 [tools]
-# pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
-"github:endevco/pitchfork" = "2.10.0"
-# nu — every gsv-local TOML-task body is `run = '''#!/usr/bin/env nu ...'''`.
-"github:nushell/nushell" = "0.112"
-# fnox — gsv tasks read CLOUDFLARE_API_TOKEN, GSV_PASSWORD etc. from it.
-"github:jdx/fnox"        = "1.24"
-# Shared-lib tasks (ci:*, cf:*, secrets:*) bring their own gh + jq via per-task
-# `tools = { ... }`, so we no longer pin them here.
-
-# gsv-specific toolchain (matches existing CI: Node 24, Rust stable + wasm32 target).
+# Language toolchains.
 node = "26"
 rust = { version = "stable", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
-# zig provides `zig cc` for cross-compiling C code to wasm32 (used by ripgit's
-# zstd dep via ripgit/scripts/wasm-cc). Apple clang doesn't ship wasm targets.
+# `zig cc` cross-compiles C → wasm32 for ripgit's zstd-sys (Apple clang has no
+# wasm target). Wired up via .mise-bin/zig-cc + the env vars below.
 zig = "0.16"
 
-# aube — fast Node package manager (drop-in npm replacement).
-"github:endevco/aube" = "1.9.0"
-# sccache — Rust compiler cache. Speeds up local `cargo build` AND CI by caching
-# compiler invocations content-addressably. Set RUSTC_WRAPPER=sccache below.
-# github backend pulls Mozilla's prebuilt binary; cargo backend would chicken-
-# and-egg with RUSTC_WRAPPER.
-"github:mozilla/sccache" = "0.15.0"
+# Task runtime + secrets.
+"github:nushell/nushell" = "0.112"
+"github:jdx/fnox"        = "1.24"
+
+# Long-lived daemon orchestrator (dev-stack, device daemon).
+"github:endevco/pitchfork" = "2.10.0"
+
+# Build helpers.
+"github:endevco/aube"    = "1.9.0"   # npm-compatible package manager
+"github:mozilla/sccache" = "0.15.0"  # cargo compiler cache; see RUSTC_WRAPPER below
 
 [env]
 CARGO_TERM_COLOR = "always"
+RUSTC_WRAPPER    = "sccache"
 
-# sccache — speeds up local `cargo build` and CI alike. Locally writes to
-# ~/.cache/sccache; in CI add SCCACHE_GHA_ENABLED=true to use GH Actions cache.
-RUSTC_WRAPPER = "sccache"
-
-# Add project-local shims dir to PATH (no-op flock for macOS where util-linux's
-# flock isn't available, plus zig-cc target translator).
+# Add project-local shims to PATH (zig-cc target translator + macOS flock no-op).
 _.path = [".mise-bin"]
 
-# Force ripgit's wasm-cc shim to use `zig cc` instead of Apple's clang. Apple clang
-# doesn't ship a wasm32-unknown-unknown target; zig does.
-RIPGIT_WASM_CC = "{{config_root}}/.mise-bin/zig-cc"
-# Same for cargo's `cc` crate (used by zstd-sys for build.rs C compilation).
+# Force the wasm32 cc to be `zig cc` instead of Apple clang (which has no wasm target).
+# RIPGIT_WASM_CC is consumed by ripgit/scripts/wasm-cc; CC_wasm32_unknown_unknown
+# is read by cargo's `cc` crate (zstd-sys' build.rs).
+RIPGIT_WASM_CC            = "{{config_root}}/.mise-bin/zig-cc"
 CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc"
 
-# Which fnox keys get synced to GitHub Actions secrets via `mise run secrets:sync-github`.
+# Which fnox keys `mise run secrets:sync-github` pushes to GH Actions secrets.
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,CF_API_TOKEN,CF_ACCOUNT_ID"
