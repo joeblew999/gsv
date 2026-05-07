@@ -41,10 +41,10 @@ Composites: `system-local` (1,2,3,4,8,9), `system-cloud` (1→7), `system-up` (e
 
 ## CI tooling
 
-- **`mise run ci`** — same task local + CI. Runs `ci-parse-check` + `test-cli` + `test-gateway` via `#MISE depends`.
-- **`mise run ci-watch`** — streams per-job and per-step CI transitions via gh CLI (token from fnox). Has retry on transient gh API errors.
-- **`mise run ci-clean`** — deletes failed/cancelled runs (default), `--all` for nuclear, `--dry-run` to preview.
-- **`mise run mise-upgrade [--dry-run]`** — bumps `mise.toml` pins via `mise upgrade --bump --local`. Workflow runs it weekly + opens a PR.
+- **`mise run ci`** — same task local + CI. Runs `ci-parse-check` + `test-cli` + `test-gateway` via `#MISE depends`. **gsv-specific** (lives here).
+- **`mise run ci:watch`** — streams per-job and per-step CI transitions via gh CLI. **From shared lib** (`joeblew999/.github` v0.14.0+).
+- **`mise run ci:clean`** — deletes failed/cancelled runs. **From shared lib.**
+- **`mise run mise:upgrade [--dry-run]`** — bumps `mise.toml` pins via `mise upgrade --bump --local`. **From shared lib.** Workflow runs it weekly + opens a PR.
 
 ## Known gotchas — keep in mind
 

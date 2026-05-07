@@ -21,8 +21,8 @@ jobs:
           version: 2026.5.1
           install: false
 
-      - name: mise run mise-upgrade
-        run: mise run mise-upgrade
+      - name: mise run mise:upgrade
+        run: mise run mise:upgrade
 
       - name: Open PR if mise.toml changed
         uses: peter-evans/create-pull-request@v7
@@ -32,12 +32,12 @@ jobs:
           delete-branch: true
           title: "chore(mise): bump pinned tool versions"
           body: |
-            Automated weekly bump produced by `mise run mise-upgrade`.
+            Automated weekly bump produced by `mise run mise:upgrade`
+            (from joeblew999/.github shared library v0.14.0+).
 
-            Workflow: `.github/workflows/mise-upgrade.yml`
-            Task source: `mise-tasks/mise-upgrade`
+            Diff is whatever `mise upgrade --bump --local` produced for
+            `mise.toml`. Run the same thing locally:
 
-            Diff is whatever `mise upgrade --bump` produced for `mise.toml`.
-            Run the same thing locally: `mise run mise-upgrade --dry-run`.
+                mise run mise:upgrade --dry-run
           add-paths: mise.toml
           labels: dependencies, automated
