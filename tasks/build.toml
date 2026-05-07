@@ -251,6 +251,11 @@ def main [out_dir?: string] {
 
   print ""
   print $"✓ bundles ready in ($out):"
-  ls $"($out)/gsv-cloudflare-*.tar.gz" | each { |f| print $"  ($f.name | path basename) (($f.size))" }
+  # `ls $"...*.tar.gz"` errors with DoNotExpand on string-interpolated globs.
+  # Filter the dir listing instead — works whether or not matches exist.
+  ls $out
+    | where { |f| ($f.name | path basename | str starts-with "gsv-cloudflare-") and ($f.name | str ends-with ".tar.gz") }
+    | each { |f| print $"  ($f.name | path basename) \(($f.size)\)" }
+    | ignore
 }
 '''

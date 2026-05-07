@@ -36,7 +36,7 @@ zig = "0.16"
 "github:endevco/pitchfork" = "2.10.0"
 
 # Build helpers.
-"github:endevco/aube"    = "1.9.0"   # npm-compatible package manager
+"github:endevco/aube"    = "1.9.1"   # npm-compatible package manager
 "github:mozilla/sccache" = "0.15.0"  # cargo compiler cache; see RUSTC_WRAPPER below
 # worker-build is required by `mise run 3-build-rust` but NOT pinned here:
 # `cargo:worker-build` installs from crates.io, which trips on the
