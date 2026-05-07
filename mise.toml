@@ -1,3 +1,8 @@
+[settings]
+# extends task-inheritance is mise experimental — joeblew999/.github
+# v0.18+ uses it for per-namespace tools dedup (cf:_base, bw:_base, etc).
+experimental = true
+
 [task_config]
 # Local mise-tasks/ holds gsv's own file-tasks (auto-discovered by mise).
 # Shared library tasks come in via tasks/<ns>.toml URLs at v0.17.3 —
@@ -15,14 +20,14 @@
 # browseable equivalents (drop `git::`, drop `.git`, swap `?ref=v…` for
 # `/blob/v…/`):
 #
-#   https://github.com/joeblew999/.github/blob/v0.17.3/tasks/ci.toml
-#   https://github.com/joeblew999/.github/blob/v0.17.3/tasks/cf.toml
-#   https://github.com/joeblew999/.github/blob/v0.17.3/tasks/secrets.toml
+#   https://github.com/joeblew999/.github/blob/v0.18.0/tasks/ci.toml
+#   https://github.com/joeblew999/.github/blob/v0.18.0/tasks/cf.toml
+#   https://github.com/joeblew999/.github/blob/v0.18.0/tasks/secrets.toml
 includes = [
   "mise-tasks",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.17.3",
-  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.17.3",
-  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.17.3",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.18.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.18.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.18.0",
 ]
 
 [tools]
