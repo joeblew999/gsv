@@ -5,7 +5,7 @@
 # wrangler:*, fnox:* etc.
 includes = [
   "mise-tasks",
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.1",
+  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.2",
 ]
 
 [tools]
