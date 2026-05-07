@@ -1,8 +1,11 @@
 # AGENTS.joeblew999.md — branch-local agent guide
 
 Operational brief for any AI agent working on the `joeblew999` branch.
-Additive to upstream's [AGENTS.md](./AGENTS.md) — that file's rules still
-apply; this one adds the joeblew999-branch-specific conventions.
+
+**Three guides apply, in this order:**
+1. **[org-wide rules](https://github.com/joeblew999/.github/blob/main/AGENTS.md)** — joeblew999/.github/AGENTS.md. Mise + nu + TOML-task authoring conventions, shared lib usage. The SSOT for everything that's not specific to one repo.
+2. **[upstream AGENTS.md](./AGENTS.md)** — upstream's project rules (deathbyknowledge/gsv).
+3. **This file** — gsv-on-joeblew999-branch specifics: numbered orchestration, gotchas, secret keys.
 
 Keep mise, pitchfork, mise-tasks, and CI all working as one coherent system.
 
@@ -45,27 +48,24 @@ Composites: `system-local` (1,2,3,4,8,9), `system-cloud` (1→7), `system-up` (e
 
 ## Tasks from the shared library (joeblew999/.github)
 
-gsv consumes these via TOML-task includes at `?ref=v0.16.0+` (see `mise.toml`).
-Per-task `tools = { ... }` propagates fnox/gh automatically — gsv doesn't pin
-them just because shared tasks need them.
+gsv consumes these via TOML-task includes at `?ref=v0.18.0+` (see `mise.toml`).
+v0.18+ uses `extends` for per-task tools dedup; the experimental flag is set.
+
+Tasks gsv directly uses:
 
 - **`mise run ci:parse-check`** — parse-check every nu file in `mise-tasks/`. Filters to files with nu shebang.
+- **`mise run ci:check-toml-tasks`** (v0.17.5+) — parse-check every inline `run = '''...'''` body in `tasks/*.toml`.
+- **`mise run ci:check-workflow-nu`** (v0.17.5+) — parse-check embedded nu blocks in `.github/workflows/*.yml`.
 - **`mise run ci:watch`** — streams per-job + per-step CI transitions; dumps failed-step logs via gh api.
 - **`mise run ci:clean`** — deletes failed/cancelled runs. `--all` to nuke; `--dry-run` to preview.
 - **`mise run cf:token-check`** — verify `CLOUDFLARE_API_TOKEN` is valid. Used by `6-deploy-cloud` and `prove-all` as a precondition.
 - **`mise run secrets:sync-github`** — push `FNOX_SYNC_KEYS` from fnox → GH Actions secrets.
 
-**Other namespaces still on the legacy v0.10.0 directory include** (`mise-tasks` dir):
-`bw:*`, `wrangler:*`, `prove:*`, `mobile:*`, `rust:*`, `release`, `env:resolve`,
-`fnox:init`, `mise:upgrade`. Will be ported to TOML-tasks as needed. Currently
-gsv doesn't reference any of them — switch to v0.16.x TOML-task includes if
-gsv ever does.
+For everything else (bw, wrangler, prove, mobile, rust, release, env:resolve, fnox:init, mise:upgrade), see the [upstream README](https://github.com/joeblew999/.github/blob/main/tasks/) and add the include URL to `mise.toml` as needed.
 
-**Cross-repo audit commands** (mise tracks every config it has trusted):
-- **`mise config ls --tracked-configs`** — index of every mise.toml on this machine
-- **`mise outdated --all`** — diff every pinned tool against registry latest, across all configs
-- **`mise upgrade --bump --local`** — rewrite *current* config's pins to latest
-- ⚠ `?ref=vX.Y.Z` URLs in `task_config.includes` are NOT tools — `mise outdated` doesn't see them. Manual sweep until we ship `audit:lib-refs` upstream.
+**Cross-repo audit commands** (see [.github/AGENTS.md](https://github.com/joeblew999/.github/blob/main/AGENTS.md) for details):
+- `mise config ls --tracked-configs`, `mise outdated --all`, `mise upgrade --bump --local`
+- ⚠ `?ref=vX.Y.Z` URLs in `task_config.includes` are NOT tools — `mise outdated` doesn't track them.
 
 ## Known gotchas — keep in mind
 
