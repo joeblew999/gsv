@@ -23,9 +23,12 @@ def main [] {
 
   print ""
   print "→ adapter installs..."
-  # Normalize to forward slashes so glob works cross-platform — `path self`
-  # on Windows produces backslashes which nu's glob parser rejects.
-  let adapters_glob = ($REPO_ROOT | str replace --all '\' '/' | path join "adapters" "*")
+  # Forward-slash glob pattern that works on Windows. We can't use
+  # `path join` here because nu's path join uses the platform separator
+  # (backslash on Windows), which re-introduces the very characters
+  # nu's glob parser rejects. String interpolation + a final
+  # backslash→forward-slash sweep handles both OSes.
+  let adapters_glob = ($"($REPO_ROOT)/adapters/*" | str replace --all '\' '/')
   glob $adapters_glob
     | where { |p| ($p | path join package.json | path exists) }
     | each { |p|
