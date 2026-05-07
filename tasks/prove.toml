@@ -4,18 +4,16 @@
 # daemon, end-to-end chat round-trip.
 
 # ── prove:_base ──
-# Locally hidden base; renamed-prefix avoids collision with shared lib's
-# `prove:_base` (which lives in joeblew999/.github/tasks/prove.toml).
-# That shared base is included by the lib's own files only — never by
-# this consumer — so there's no actual conflict, but the suffix keeps
-# the relationship readable.
-["prove-local:_base"]
+# Note: gsv's prove-* tasks are NOT the same as joeblew999/.github's
+# prove:* namespace (which probes CF Access deployments). gsv doesn't
+# include that shared file — these are gsv-stack-specific probes.
+["prove:_base"]
 hide = true
 tools = { "github:nushell/nushell" = "0.112" }
 
 # ── prove-all ──
 ["prove-all"]
-extends = "prove-local:_base"
+extends = "prove:_base"
 description = "Run every probe (CF token, local stack, cloud gateway, device daemon)"
 depends = ["cf:token-check", "prove-local", "prove-cloud", "prove-device"]
 run = '''
@@ -28,7 +26,7 @@ def main [] {
 
 # ── prove-local ──
 ["prove-local"]
-extends = "prove-local:_base"
+extends = "prove:_base"
 description = "Probe the local dev stack — expect 200 from http://localhost:8787"
 run = '''
 #!/usr/bin/env nu
@@ -46,7 +44,7 @@ def main [] {
 
 # ── prove-cloud ──
 ["prove-cloud"]
-extends = "prove-local:_base"
+extends = "prove:_base"
 description = "Probe the deployed CF gateway — reads URL from local gsv config"
 run = '''
 #!/usr/bin/env nu
@@ -71,7 +69,7 @@ def main [] {
 
 # ── prove-chat ──
 ["prove-chat"]
-extends = "prove-local:_base"
+extends = "prove:_base"
 description = "End-to-end smoke: send a one-shot chat to the configured agent, expect a non-empty reply"
 run = '''
 #!/usr/bin/env nu
@@ -93,7 +91,7 @@ def main [] {
 
 # ── prove-device ──
 ["prove-device"]
-extends = "prove-local:_base"
+extends = "prove:_base"
 description = "Prove the device daemon is connected — reads ~/.gsv/logs/node.log; works for pitchfork or launchd"
 run = '''
 #!/usr/bin/env nu
