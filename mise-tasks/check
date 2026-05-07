@@ -1,0 +1,14 @@
+#!/usr/bin/env nu
+#MISE description="Run all repo checks: ci:parse-check + test-cli + test-gateway"
+#MISE depends=["ci:parse-check", "test-cli", "test-gateway"]
+
+# Local "run all checks" bundle. Renamed from `ci` to avoid namespace
+# collision with the shared lib's `ci:*` (ci:watch, ci:clean, ci:parse-check).
+# CI workflow calls `mise run check` — to change what CI does, edit this
+# depends list. Trimmed from earlier shape:
+#  - 4-build-cli dropped (test-cli's `cargo test` already compiles cli/)
+#  - test-ripgit dropped (upstream's ci.yml runs cargo test in ripgit on main)
+
+def main [] {
+  print "✓ all checks passed"
+}

@@ -11,31 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# SSOT: one job per OS runs `mise run ci`. The task's `#MISE depends=[...]`
-# in mise-tasks/ci does parse-check + cli tests + gateway tests. Edit that
-# file to change CI; never enumerate steps here.
-
 jobs:
   ci:
-    name: CI (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: jdx/mise-action@v4
-        with:
-          version: 2026.5.1
-          install: true
-          cache: true
-          # Workaround for jdx/mise-action#382 — default cache key has
-          # prefix-match collisions. Custom key keyed on (job, os, mise.toml hash).
-          cache_key: mise-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('mise.toml') }}
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/sccache
-          key: sccache-${{ matrix.os }}-${{ hashFiles('cli/Cargo.lock') }}
-          restore-keys: sccache-${{ matrix.os }}-
-      - run: mise run ci
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.0
+    with:
+      task: check
+      cargo-lock-path: cli/Cargo.lock
