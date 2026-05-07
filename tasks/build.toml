@@ -92,7 +92,9 @@ const CRATES = ["assembler", "ripgit"]
 
 def main [] {
   if (which worker-build | is-empty) {
-    print --stderr "✗ worker-build not on PATH — run `mise install` (mise.toml pins cargo:worker-build)"
+    print --stderr "✗ worker-build not on PATH. Install once with:"
+    print --stderr "    cargo install -f worker-build"
+    print --stderr "  (not auto-pinned in mise.toml because cargo install collides with RUSTC_WRAPPER=sccache)"
     exit 1
   }
 

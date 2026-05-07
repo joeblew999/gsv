@@ -123,7 +123,7 @@ This branch adds a [mise](https://mise.jdx.dev) + [nushell](https://www.nushell.
 ### First-time setup (~30 seconds)
 
 ```bash
-mise install                # nushell, fnox, gh, jq, aube, node, rust, zig, pitchfork, worker-build
+mise install                # installs everything in mise.toml [tools] — node, rust, zig, nu, fnox, pitchfork, aube, sccache
 fnox set --provider keychain CLOUDFLARE_API_TOKEN     # only if deploying to CF
 fnox set --provider keychain CLOUDFLARE_ACCOUNT_ID
 mise run cf:token-check     # ✓ verifies CF token (only if you set the above)
@@ -190,7 +190,7 @@ Composites: `system-local` (1, 2, 3, 4, 8, 9) · `system-cloud` (1→7) · `syst
 
 ### CI
 
-`.github/workflows/mise.yml` parse-checks every nu task file on Linux + macOS + Windows. Triggered automatically on push to `joeblew999`, or manually:
+`.github/workflows/mise.yml` runs `mise run check` on Linux + macOS + Windows — parse-checks every nu body in `tasks/*.toml` + every embedded nu block in workflow YAML, then runs `test-cli` + `test-gateway`. Triggered on push to `joeblew999` or PR into `joeblew999`/`main`. Manual run:
 
 ```bash
 gh workflow run mise.yml --ref joeblew999 --repo joeblew999/gsv

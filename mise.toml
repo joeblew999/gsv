@@ -38,6 +38,13 @@ zig = "0.16"
 # Build helpers.
 "github:endevco/aube"    = "1.9.0"   # npm-compatible package manager
 "github:mozilla/sccache" = "0.15.0"  # cargo compiler cache; see RUSTC_WRAPPER below
+# worker-build is required by `mise run 3-build-rust` but NOT pinned here:
+# `cargo:worker-build` installs from crates.io, which trips on the
+# RUSTC_WRAPPER=sccache env (sccache wraps rustc during the install itself
+# and chokes on the rustup toolchain path). Install once manually:
+#   cargo install -f worker-build
+# CI workaround: cf:* and check don't invoke 3-build-rust, so green CI
+# without worker-build is fine. Local users running system-local need it.
 
 [env]
 CARGO_TERM_COLOR = "always"
