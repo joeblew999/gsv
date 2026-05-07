@@ -24,7 +24,14 @@ experimental = true
 #   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/cf.toml
 #   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/secrets.toml
 includes = [
-  "mise-tasks",
+  # Local TOML-tasks (porting from mise-tasks/ in progress — same names, TOML format).
+  # Each TOML file replaces sibling file-tasks; remove from mise-tasks/ as ported.
+  "tasks/check.toml",
+  "tasks/test.toml",
+  "tasks/build.toml",
+  "tasks/prove.toml",
+  "tasks/system.toml",
+  # Shared lib (joeblew999/.github)
   "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
   "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.1",
   "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.1",

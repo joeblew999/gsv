@@ -1,0 +1,17 @@
+# tasks/check.toml — top-level "lint everything" aggregator.
+#
+# Single entry point invoked by .github/workflows/mise.yml (which calls
+# `mise run check`). To change what CI does, edit the depends list here —
+# never enumerate steps in the YAML.
+
+["check"]
+description = "Run all repo checks: ci:parse-check + ci:check-workflow-nu + test-cli + test-gateway"
+depends = ["ci:parse-check", "ci:check-workflow-nu", "test-cli", "test-gateway"]
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "✓ all checks passed"
+}
+'''
