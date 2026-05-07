@@ -37,18 +37,17 @@ zig = "0.16"
 
 # Build helpers.
 "github:endevco/aube"    = "1.9.1"   # npm-compatible package manager
-"github:mozilla/sccache" = "0.15.0"  # cargo compiler cache; see RUSTC_WRAPPER below
-# worker-build is required by `mise run 3-build-rust` but NOT pinned here:
-# `cargo:worker-build` installs from crates.io, which trips on the
-# RUSTC_WRAPPER=sccache env (sccache wraps rustc during the install itself
-# and chokes on the rustup toolchain path). Install once manually:
-#   cargo install -f worker-build
-# CI workaround: cf:* and check don't invoke 3-build-rust, so green CI
-# without worker-build is fine. Local users running system-local need it.
+"github:mozilla/sccache" = "0.15.0"  # cargo compiler cache (see RUSTC_WRAPPER per-task in tasks/build.toml + test.toml)
+"cargo:worker-build"     = "0.7"     # Rust → wasm32 worker bundler (used by 3-build-rust)
 
 [env]
 CARGO_TERM_COLOR = "always"
-RUSTC_WRAPPER    = "sccache"
+# RUSTC_WRAPPER=sccache is set per-task in tasks/build.toml + tasks/test.toml,
+# NOT at the project level. Project-level RUSTC_WRAPPER trips `mise install` of
+# cargo:* tools (sccache wraps rustc during the install itself and the install
+# subprocess doesn't have sccache on PATH yet). Per-task scope correctly
+# matches the variable's purpose: it's a "when running cargo for our crates"
+# setting, not a "any subprocess that might invoke rustc" setting.
 
 # Add project-local shims to PATH (zig-cc target translator + macOS flock no-op).
 _.path = [".mise-bin"]

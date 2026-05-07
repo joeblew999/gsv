@@ -1,9 +1,11 @@
 # tasks/test.toml — gsv unit/integration test tasks.
 
 # ── test:_base ──
+# RUSTC_WRAPPER=sccache scoped per-task — see tasks/build.toml for rationale.
 ["test:_base"]
 hide = true
 tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
 
 # ── test-cli ──
 ["test-cli"]

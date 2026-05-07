@@ -60,12 +60,17 @@ def main [] {
     exit 1
   }
 
-  # The cloud gateway URL — read from gsv's local config if set, else default.
-  let cfg_url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
-  let url = if ($cfg_url | is-not-empty) { $cfg_url } else { "wss://gsv.gedw99.workers.dev/ws" }
+  # The cloud gateway URL must be configured. We don't guess an account.
+  let url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
+  if ($url | is-empty) {
+    print --stderr "✗ gateway.url not set in local gsv config — run e.g.:"
+    print --stderr "    gsv config --local set gateway.url wss://gsv.<account>.workers.dev/ws"
+    exit 1
+  }
 
-  print $"→ onboarding ($url)..."
-  let result = (do { ^$gsv --url $url auth setup --username joe --new-password $pw --node-id macbook --node-label macbook } | complete)
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  print $"→ onboarding ($url) as node ($node_id)..."
+  let result = (do { ^$gsv --url $url auth setup --username joe --new-password $pw --node-id $node_id --node-label $node_id } | complete)
 
   if $result.exit_code == 0 {
     print $"✓ cloud onboarded \(($url)\)"
@@ -135,7 +140,8 @@ def main [] {
     $waited = $waited + 2
   }
 
-  let result = (do { ^$gsv --url ws://localhost:8787/ws auth setup --username joe --new-password $pw --node-id macbook --node-label macbook } | complete)
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  let result = (do { ^$gsv --url ws://localhost:8787/ws auth setup --username joe --new-password $pw --node-id $node_id --node-label $node_id } | complete)
 
   if $result.exit_code == 0 {
     print "✓ local onboarded"
@@ -166,10 +172,11 @@ def main [] {
   if ($token | is-empty) {
     print --stderr "✗ node.token not set in local gsv config."
     print --stderr ""
+    let host = (sys host | get hostname)
     print --stderr "Issue a token + save it first:"
-    print --stderr "  gsv auth token create --kind node --device macbook --label macbook"
+    print --stderr $"  gsv auth token create --kind node --device ($host) --label ($host)"
     print --stderr "  gsv config --local set node.token <token-from-above>"
-    print --stderr "  gsv config --local set node.id macbook"
+    print --stderr $"  gsv config --local set node.id ($host)"
     print --stderr "  gsv config --local set gateway.url wss://gsv.<account>.workers.dev/ws  # or ws://localhost:8787/ws"
     exit 1
   }
@@ -188,7 +195,8 @@ run = '''
 
 def main [] {
   print "✓ cloud system up"
-  print "  https://gsv.gedw99.workers.dev — onboarded as joe"
+  print "  cloud gateway: see `gsv config --local get gateway.url`"
+  print "  user: joe"
   print "  password: fnox get GSV_PASSWORD"
 }
 '''
@@ -218,7 +226,7 @@ run = '''
 
 def main [] {
   print "✓ full system up"
-  print "  cloud:   https://gsv.gedw99.workers.dev"
+  print "  cloud:   see `gsv config --local get gateway.url`"
   print "  local:   http://localhost:8787"
   print "  device:  connected (see ~/.gsv/logs/node.log)"
   print ""
@@ -276,7 +284,8 @@ run = '''
 
 def main [] {
   let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
-  ^$gsv device run --id macbook --workspace $env.HOME
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  ^$gsv device run --id $node_id --workspace $env.HOME
 }
 '''
 

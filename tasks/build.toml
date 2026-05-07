@@ -1,9 +1,12 @@
 # tasks/build.toml — phased build pipeline (1-deps → 5-build-bundles).
 
 # ── build:_base ──
+# RUSTC_WRAPPER=sccache lives here (not project-level) so mise install of
+# cargo:* tools can run without sccache wrapping the install rustc itself.
 ["build:_base"]
 hide = true
 tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
 
 # ── 1-deps ──
 # Aube is a fast Node package manager (drop-in npm replacement). Reads existing
@@ -92,9 +95,7 @@ const CRATES = ["assembler", "ripgit"]
 
 def main [] {
   if (which worker-build | is-empty) {
-    print --stderr "✗ worker-build not on PATH. Install once with:"
-    print --stderr "    cargo install -f worker-build"
-    print --stderr "  (not auto-pinned in mise.toml because cargo install collides with RUSTC_WRAPPER=sccache)"
+    print --stderr "✗ worker-build not on PATH — run `mise install` (mise.toml pins cargo:worker-build)"
     exit 1
   }
 
