@@ -1,22 +1,25 @@
 [task_config]
-# Order matters: local `mise-tasks/` first so our numbered file tasks are
-# discovered. Setting `includes` disables mise's default auto-discovery, so we
-# list both explicitly. Shared joeblew999 task library provides cf:*, secrets:*,
-# wrangler:*, fnox:* etc.
+# Local mise-tasks/ first so gsv's numbered file tasks are discovered.
+# Shared library tasks come in via tasks/<ns>.toml — each TOML-task block
+# declares its own `tools = { ... }`, so consumers don't need to pin
+# fnox/gh/jq just because a shared task uses them. See joeblew999/.github
+# v0.16.0 release notes + tasks-toml-proof.yml for the cross-OS canary.
 includes = [
   "mise-tasks",
-  "git::https://github.com/joeblew999/.github.git//mise-tasks?ref=v0.15.3",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.16.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.16.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.16.0",
 ]
 
 [tools]
-# Pins required by the shared library at v0.10.0 (every shared task is nu).
-# 
 # pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
 "github:endevco/pitchfork" = "2.10.0"
+# nu — every gsv local task is a nu file task.
 "github:nushell/nushell" = "0.112"
-"github:jdx/fnox"        = "1.23"
-"github:cli/cli"         = "2"      # gh CLI — github backend works (tags are v<semver>)
-"aqua:jqlang/jq"         = "1"      # jq — tags are `jq-1.7.x`, github backend mis-parses, aqua maps it correctly
+# fnox — gsv local tasks read CLOUDFLARE_API_TOKEN, GSV_PASSWORD etc. from it.
+"github:jdx/fnox"        = "1.24"
+# Shared-lib tasks (ci:*, cf:*, secrets:*) bring their own gh + jq via per-task
+# `tools = { ... }`, so we no longer pin them here.
 
 # gsv-specific toolchain (matches existing CI: Node 24, Rust stable + wasm32 target).
 node = "26"
