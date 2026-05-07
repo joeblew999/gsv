@@ -78,6 +78,10 @@ const TARGET_CHAT_PROCESS_EVENT = "gsv:target-chat-process";
 const PENDING_TARGETS_KEY = "__gsvPendingChatProcessTargets";
 const WINDOW_ID = new URL(window.location.href).searchParams.get("windowId")?.trim() || "";
 
+function historyTargetKey(target: Pick<ThreadContext, "pid" | "conversationId">): string {
+  return `${target.pid}\n${target.conversationId || "default"}`;
+}
+
 const EMPTY_ARCHIVE: ArchiveState = {
   loading: false,
   error: "",
@@ -197,6 +201,7 @@ export function App({ backend }: { backend: ChatBackend }) {
   const [rows, setRows] = useState<LogRow[]>(() => systemRows("Connecting chat backend."));
   const [messageCount, setMessageCount] = useState(0);
   const [contextState, setContextState] = useState<ContextState | null>(null);
+  const [contextStatesByConversation, setContextStatesByConversation] = useState<Record<string, ContextState>>({});
   const [pendingAssistant, setPendingAssistant] = useState<PendingAssistantState>(null);
   const [pendingHil, setPendingHil] = useState<HilRequest | null>(null);
   const [messageBusy, setMessageBusy] = useState(false);
@@ -229,6 +234,7 @@ export function App({ backend }: { backend: ChatBackend }) {
   const recorderElapsedMsRef = useRef(0);
   const recorderTimerRef = useRef<number | null>(null);
   const recorderCancelRef = useRef(false);
+  const skipNextHistoryLoadRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeRef.current = active;
@@ -282,17 +288,33 @@ export function App({ backend }: { backend: ChatBackend }) {
   const canActOnConversation = interactive && Boolean(active?.pid) && !messageBusy && pendingAssistant === null;
 
   const setActive = useCallback((next: ThreadContext | null) => {
+    const previous = activeRef.current;
     const normalized = setStoredThreadContext(next);
+    const processChanged = previous?.pid !== normalized?.pid;
     activeRef.current = normalized;
     setActiveState(normalized);
-    setContextState(null);
-    setPendingHil(null);
-    setPendingAssistant(null);
-    setMessageCount(0);
-    setArchive(EMPTY_ARCHIVE);
+    if (!normalized) {
+      setContextState(null);
+      setPendingHil(null);
+      setPendingAssistant(null);
+      setMessageCount(0);
+      setArchive(EMPTY_ARCHIVE);
+    } else if (processChanged) {
+      setContextState(null);
+      setContextStatesByConversation({});
+      setPendingHil(null);
+      setPendingAssistant(null);
+      setMessageCount(0);
+      setArchive(EMPTY_ARCHIVE);
+    } else {
+      setContextState((current) => {
+        const cached = contextStatesByConversation[normalized.conversationId] ?? null;
+        return cached ?? current;
+      });
+    }
     setWorkspaceView("chat");
     setNotice("");
-  }, []);
+  }, [contextStatesByConversation]);
 
   const appendSystem = useCallback((text: string) => {
     setRows((current) => dropEmptyPlaceholder(current).concat(systemRow(text)));
@@ -543,6 +565,7 @@ export function App({ backend }: { backend: ChatBackend }) {
   const loadHistory = useCallback(async (target = activeRef.current) => {
     if (!target?.pid) {
       setContextState(null);
+      setContextStatesByConversation({});
       setMessageCount(0);
       setRows(systemRows("No thread selected. Send a message to start a new thread."));
       return;
@@ -586,6 +609,18 @@ export function App({ backend }: { backend: ChatBackend }) {
       }
       setMessageCount(total);
       setContextState(nextContext);
+      setContextStatesByConversation((current) => {
+        const conversationId = target.conversationId || "default";
+        if (!nextContext) {
+          if (!(conversationId in current)) {
+            return current;
+          }
+          const nextStates = { ...current };
+          delete nextStates[conversationId];
+          return nextStates;
+        }
+        return { ...current, [conversationId]: nextContext };
+      });
       setPendingHil(nextHil);
       setPendingAssistant(null);
       setRows(flattened);
@@ -695,7 +730,12 @@ export function App({ backend }: { backend: ChatBackend }) {
     if (active?.pid) {
       void backend.watchProcessSignals({ pid: active.pid }).catch((error) => setHostError(formatError(error)));
       void loadConversations(active.pid);
-      void loadHistory(active);
+      const historyKey = historyTargetKey(active);
+      if (skipNextHistoryLoadRef.current === historyKey) {
+        skipNextHistoryLoadRef.current = null;
+      } else {
+        void loadHistory(active);
+      }
       return () => {
         void backend.unwatchProcessSignals({ pid: active.pid }).catch(() => {});
       };
@@ -763,6 +803,7 @@ export function App({ backend }: { backend: ChatBackend }) {
       } else if (signal === "process.context") {
         const next = normalizeContextSignal(payload, target);
         if (next) {
+          setContextStatesByConversation((current) => ({ ...current, [next.conversationId]: next }));
           setContextState(next);
         }
       } else if (signal === "process.lifecycle") {
@@ -942,6 +983,7 @@ export function App({ backend }: { backend: ChatBackend }) {
           appendSystem("thread start failed: invalid process target");
           return;
         }
+        skipNextHistoryLoadRef.current = historyTargetKey(target);
         setActive(target);
         await backend.watchProcessSignals({ pid: target.pid }).catch((error) => setHostError(formatError(error)));
         void loadThreads();
