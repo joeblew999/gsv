@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.0
+    uses: joeblew999/.github/.github/workflows/reusable-mise-ci.yml@v0.15.1
     with:
       task: check
       cargo-lock-path: cli/Cargo.lock
