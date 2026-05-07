@@ -4,45 +4,35 @@
 experimental = true
 
 [task_config]
-# Local mise-tasks/ holds gsv's own file-tasks (auto-discovered by mise).
-# Shared library tasks come in via tasks/<ns>.toml URLs at v0.17.3 —
-# each TOML-task block declares its own `tools = { ... }`, so consumers
-# don't need to pin fnox/gh/jq just because a shared task uses them.
-# See joeblew999/.github v0.17.x release notes + tasks-toml-proof.yml.
+# All gsv-local tasks live in tasks/<ns>.toml (TOML-tasks with extends-based
+# <ns>:_base for shared tools — same pattern as joeblew999/.github).
+# Shared library tasks come in via per-namespace `git::` URLs; per-task
+# `tools = { ... }` blocks propagate, so we don't pin gh/jq globally.
 #
-# Naming convention (matches .github):
-#   mise-tasks/         → executable file-tasks (auto-discovered locally)
-#   tasks/<ns>.toml     → TOML-task files (consumed remotely via git:: URL)
-#
-# `git::` is mise's prefix for git-fetched configs. The form below is
-# *mise* URL syntax; clicking it in the IDE will 404 because browsers
-# can't follow `git::` and the GitHub blob URL form differs. The
-# browseable equivalents (drop `git::`, drop `.git`, swap `?ref=v…` for
-# `/blob/v…/`):
-#
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/ci.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/cf.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/secrets.toml
+# Browseable URLs for the `git::` includes (drop `git::`, drop `.git`,
+# swap `?ref=v…` for `/blob/v…/`):
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/ci.toml
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/cf.toml
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/secrets.toml
 includes = [
-  # Local TOML-tasks (porting from mise-tasks/ in progress — same names, TOML format).
-  # Each TOML file replaces sibling file-tasks; remove from mise-tasks/ as ported.
+  # Local TOML-tasks (gsv-specific build/test/prove/system pipelines)
   "tasks/check.toml",
   "tasks/test.toml",
   "tasks/build.toml",
   "tasks/prove.toml",
   "tasks/system.toml",
   # Shared lib (joeblew999/.github)
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.1",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.2",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.2",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.2",
 ]
 
 [tools]
 # pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
 "github:endevco/pitchfork" = "2.10.0"
-# nu — every gsv local task is a nu file task.
+# nu — every gsv-local TOML-task body is `run = '''#!/usr/bin/env nu ...'''`.
 "github:nushell/nushell" = "0.112"
-# fnox — gsv local tasks read CLOUDFLARE_API_TOKEN, GSV_PASSWORD etc. from it.
+# fnox — gsv tasks read CLOUDFLARE_API_TOKEN, GSV_PASSWORD etc. from it.
 "github:jdx/fnox"        = "1.24"
 # Shared-lib tasks (ci:*, cf:*, secrets:*) bring their own gh + jq via per-task
 # `tools = { ... }`, so we no longer pin them here.
@@ -81,6 +71,3 @@ CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc"
 
 # Which fnox keys get synced to GitHub Actions secrets via `mise run secrets:sync-github`.
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,CF_API_TOKEN,CF_ACCOUNT_ID"
-
-# All tasks live in mise-tasks/ as nushell file tasks (with `#MISE description=`
-# and `#MISE depends=[...]` headers). Run `mise tasks ls` to see them.
