@@ -8,6 +8,16 @@
 # Naming convention (matches .github):
 #   mise-tasks/         → executable file-tasks (auto-discovered locally)
 #   tasks/<ns>.toml     → TOML-task files (consumed remotely via git:: URL)
+#
+# `git::` is mise's prefix for git-fetched configs. The form below is
+# *mise* URL syntax; clicking it in the IDE will 404 because browsers
+# can't follow `git::` and the GitHub blob URL form differs. The
+# browseable equivalents (drop `git::`, drop `.git`, swap `?ref=v…` for
+# `/blob/v…/`):
+#
+#   https://github.com/joeblew999/.github/blob/v0.16.0/tasks/ci.toml
+#   https://github.com/joeblew999/.github/blob/v0.16.0/tasks/cf.toml
+#   https://github.com/joeblew999/.github/blob/v0.16.0/tasks/secrets.toml
 includes = [
   "mise-tasks",
   "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.16.0",
