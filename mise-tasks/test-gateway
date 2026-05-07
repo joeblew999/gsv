@@ -2,10 +2,26 @@
 #MISE description="Run gateway TS tests + typecheck (vitest + tsc)"
 #MISE depends=["1-deps"]
 
+# Skipped on Windows — vitest-pool-workers + workerd has a known libuv
+# crash on Windows during worker teardown (ECONNREFUSED + UV_HANDLE_CLOSING
+# assertion in src\win\async.c). Tracked upstream:
+#   https://github.com/cloudflare/workers-sdk/issues/5439
+#   https://github.com/cloudflare/workers-sdk/issues/7414
+#   https://github.com/cloudflare/workers-sdk/issues/10600
+# gsv's prod target is Cloudflare Workers (Linux runtime), so Windows
+# coverage of these tests has limited value beyond catching local-dev
+# regressions for Windows contributors. Re-enable when workerd-on-Windows
+# stabilises in vitest-pool-workers.
+
 const SCRIPT_PATH = (path self)
 const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
 
 def main [] {
+  if (sys host | get name) == "Windows" {
+    print "⤬ test-gateway skipped on Windows (vitest-pool-workers + workerd unstable)"
+    print "  see comment in mise-tasks/test-gateway for upstream tracking issues"
+    return
+  }
   cd $"($REPO_ROOT)/gateway"
   print "→ tsc --noEmit..."
   ^aube exec -- tsc --noEmit
