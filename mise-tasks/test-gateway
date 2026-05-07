@@ -17,9 +17,12 @@ const SCRIPT_PATH = (path self)
 const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
 
 def main [] {
-  if (sys host | get name) == "Windows" {
+  # $nu.os-info.name uses Rust's std::env::consts::OS values:
+  # macos | linux | windows — more reliable than `sys host | get name`
+  # which returns "Darwin" / "Linux" / probably "Windows" but unconfirmed.
+  if $nu.os-info.name == "windows" {
     print "⤬ test-gateway skipped on Windows (vitest-pool-workers + workerd unstable)"
-    print "  see comment in mise-tasks/test-gateway for upstream tracking issues"
+    print "  see comment at top of this file for upstream tracking issues"
     return
   }
   cd $"($REPO_ROOT)/gateway"

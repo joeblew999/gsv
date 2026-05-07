@@ -1,9 +1,13 @@
 [task_config]
-# Local mise-tasks/ first so gsv's numbered file tasks are discovered.
-# Shared library tasks come in via tasks/<ns>.toml — each TOML-task block
-# declares its own `tools = { ... }`, so consumers don't need to pin
-# fnox/gh/jq just because a shared task uses them. See joeblew999/.github
-# v0.16.0 release notes + tasks-toml-proof.yml for the cross-OS canary.
+# Local mise-tasks/ holds gsv's own file-tasks (auto-discovered by mise).
+# Shared library tasks come in via tasks/<ns>.toml URLs at v0.16.0+ —
+# each TOML-task block declares its own `tools = { ... }`, so consumers
+# don't need to pin fnox/gh/jq just because a shared task uses them.
+# See joeblew999/.github v0.16.0 release notes + tasks-toml-proof.yml.
+#
+# Naming convention (matches .github):
+#   mise-tasks/         → executable file-tasks (auto-discovered locally)
+#   tasks/<ns>.toml     → TOML-task files (consumed remotely via git:: URL)
 includes = [
   "mise-tasks",
   "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.16.0",
