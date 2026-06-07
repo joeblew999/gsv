@@ -1,7 +1,26 @@
-#!/usr/bin/env nu
-#MISE description="Run gateway TS tests + typecheck (vitest + tsc)"
-#MISE depends=["1-deps"]
+# tasks/test.toml — gsv unit/integration test tasks.
 
+# ── test:_base ──
+# RUSTC_WRAPPER=sccache scoped per-task — see tasks/build.toml for rationale.
+["test:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
+
+# ── test-cli ──
+["test-cli"]
+extends = "test:_base"
+description = "Run gsv CLI unit tests (cargo test, in cli/)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  cd $"($env.MISE_PROJECT_ROOT)/cli"
+  ^cargo test
+}
+'''
+
+# ── test-gateway ──
 # Skipped on Windows — vitest-pool-workers + workerd has a known libuv
 # crash on Windows during worker teardown (ECONNREFUSED + UV_HANDLE_CLOSING
 # assertion in src\win\async.c). Tracked upstream:
@@ -12,9 +31,12 @@
 # coverage of these tests has limited value beyond catching local-dev
 # regressions for Windows contributors. Re-enable when workerd-on-Windows
 # stabilises in vitest-pool-workers.
-
-const SCRIPT_PATH = (path self)
-const REPO_ROOT = ($SCRIPT_PATH | path dirname | path dirname)
+["test-gateway"]
+extends = "test:_base"
+description = "Run gateway TS tests + typecheck (vitest + tsc)"
+depends = ["1-deps"]
+run = '''
+#!/usr/bin/env nu
 
 def main [] {
   # $nu.os-info.name uses Rust's std::env::consts::OS values:
@@ -25,10 +47,24 @@ def main [] {
     print "  see comment at top of this file for upstream tracking issues"
     return
   }
-  cd $"($REPO_ROOT)/gateway"
+  cd $"($env.MISE_PROJECT_ROOT)/gateway"
   print "→ tsc --noEmit..."
   ^aube exec -- tsc --noEmit
   print ""
   print "→ vitest..."
   ^aube test
 }
+'''
+
+# ── test-ripgit ──
+["test-ripgit"]
+extends = "test:_base"
+description = "Run ripgit Rust unit tests (cargo test, native target — no wasm bundle)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  cd $"($env.MISE_PROJECT_ROOT)/ripgit"
+  ^cargo test
+}
+'''

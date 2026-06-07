@@ -1,0 +1,314 @@
+# tasks/system.toml — gsv lifecycle tasks (deploy, onboard, daemon mgmt,
+# composition wrappers). fnox + pitchfork are pinned in root mise.toml
+# [tools] so we don't re-declare them per task.
+
+# ── system:_base ──
+["system:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+
+# ── 6-deploy-cloud ──
+["6-deploy-cloud"]
+extends = "system:_base"
+description = "Step 6 — deploy GSV infra to Cloudflare via the gsv CLI (uses fnox-backed CF token)"
+depends = ["cf:token-check", "4-build-cli", "5-build-bundles"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let repo_root = $env.MISE_PROJECT_ROOT
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let gsv = $"($repo_root)/cli/target/release/gsv"
+  if not ($gsv | path exists) {
+    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli` first"
+    exit 1
+  }
+
+  with-env {CF_API_TOKEN: $token, CF_ACCOUNT_ID: $account} {
+    cd $repo_root
+    ^$gsv infra deploy --all --bundle-dir ./release/local
+  }
+}
+'''
+
+# ── 7-onboard-cloud ──
+["7-onboard-cloud"]
+extends = "system:_base"
+description = "Step 7 — onboard the CLOUD gateway non-interactively (idempotent; uses fnox-stored password)"
+depends = ["4-build-cli", "6-deploy-cloud"]
+run = '''
+#!/usr/bin/env nu
+
+def ensure-password [] {
+  let existing = (try { ^fnox get GSV_PASSWORD | str trim } catch { "" })
+  if ($existing | is-not-empty) {
+    return $existing
+  }
+  let pw = (random chars --length 32)
+  print --stderr "→ no GSV_PASSWORD in fnox; generating one..."
+  $pw | ^fnox set --provider keychain GSV_PASSWORD
+  print --stderr "✓ saved GSV_PASSWORD to fnox keychain"
+  $pw
+}
+
+def main [] {
+  let pw = (ensure-password)
+  let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
+  if not ($gsv | path exists) {
+    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli`"
+    exit 1
+  }
+
+  # The cloud gateway URL must be configured. We don't guess an account.
+  let url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
+  if ($url | is-empty) {
+    print --stderr "✗ gateway.url not set in local gsv config — run e.g.:"
+    print --stderr "    gsv config --local set gateway.url wss://gsv.<account>.workers.dev/ws"
+    exit 1
+  }
+
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  print $"→ onboarding ($url) as node ($node_id)..."
+  let result = (do { ^$gsv --url $url auth setup --username joe --new-password $pw --node-id $node_id --node-label $node_id } | complete)
+
+  if $result.exit_code == 0 {
+    print $"✓ cloud onboarded \(($url)\)"
+  } else if (($result.stderr | default "") | str contains "setup mode") {
+    print $"✓ cloud already onboarded \(($url)\) — skipping"
+  } else {
+    print --stderr "✗ cloud onboard failed:"
+    print --stderr ($result.stderr | default $result.stdout)
+    exit 1
+  }
+}
+'''
+
+# ── 8-up-local ──
+# Pre-builds web and rust so wrangler dev's parallel [build] hooks find fresh
+# artefacts and short-circuit, rather than racing on cargo's cache lock.
+["8-up-local"]
+extends = "system:_base"
+description = "Step 8 — start the local dev-stack daemon via pitchfork (wrangler dev on :8787)"
+depends = ["2-build-web", "3-build-rust"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  ^pitchfork start dev-stack
+}
+'''
+
+# ── 9-onboard-local ──
+["9-onboard-local"]
+extends = "system:_base"
+description = "Step 9 — onboard the LOCAL gateway non-interactively (idempotent; password auto-generated to fnox)"
+depends = ["4-build-cli", "8-up-local"]
+run = '''
+#!/usr/bin/env nu
+
+def ensure-password [] {
+  let existing = (try { ^fnox get GSV_PASSWORD | str trim } catch { "" })
+  if ($existing | is-not-empty) {
+    return $existing
+  }
+  let pw = (random chars --length 32)
+  print --stderr "→ no GSV_PASSWORD in fnox; generating one..."
+  $pw | ^fnox set --provider keychain GSV_PASSWORD
+  print --stderr "✓ saved GSV_PASSWORD to fnox keychain"
+  $pw
+}
+
+def main [] {
+  let pw = (ensure-password)
+  let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
+  if not ($gsv | path exists) {
+    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli`"
+    exit 1
+  }
+
+  # Wait for local gateway to respond before trying to onboard.
+  mut waited = 0
+  loop {
+    let ok = (try { ^curl -fsS -o /dev/null http://localhost:8787/; true } catch { false })
+    if $ok { break }
+    if $waited >= 60 {
+      print --stderr "✗ local gateway never came up at http://localhost:8787"
+      exit 1
+    }
+    sleep 2sec
+    $waited = $waited + 2
+  }
+
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  let result = (do { ^$gsv --url ws://localhost:8787/ws auth setup --username joe --new-password $pw --node-id $node_id --node-label $node_id } | complete)
+
+  if $result.exit_code == 0 {
+    print "✓ local onboarded"
+  } else if (($result.stderr | default "") | str contains "setup mode") {
+    print "✓ local already onboarded — skipping"
+  } else {
+    print --stderr "✗ local onboard failed:"
+    print --stderr ($result.stderr | default $result.stdout)
+    exit 1
+  }
+}
+'''
+
+# ── 10-up-device ──
+["10-up-device"]
+extends = "system:_base"
+description = "Step 10 — start the device daemon (requires onboarded gateway + node.token in gsv local config)"
+depends = ["4-build-cli"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
+
+  # Sanity-check: the daemon needs gateway.url + node.id + node.token set in
+  # the local gsv config. Tell the user how to do it if missing.
+  let token = (try { ^$gsv config --local get node.token | str trim } catch { "" })
+  if ($token | is-empty) {
+    print --stderr "✗ node.token not set in local gsv config."
+    print --stderr ""
+    let host = (sys host | get hostname)
+    print --stderr "Issue a token + save it first:"
+    print --stderr $"  gsv auth token create --kind node --device ($host) --label ($host)"
+    print --stderr "  gsv config --local set node.token <token-from-above>"
+    print --stderr $"  gsv config --local set node.id ($host)"
+    print --stderr "  gsv config --local set gateway.url wss://gsv.<account>.workers.dev/ws  # or ws://localhost:8787/ws"
+    exit 1
+  }
+
+  ^pitchfork start device
+}
+'''
+
+# ── system-cloud ──
+["system-cloud"]
+extends = "system:_base"
+description = "Bring up CLOUD only — steps 1→4, 5, 6, 7. Provisions CF resources + onboards. Costs money."
+depends = ["1-deps", "2-build-web", "3-build-rust", "4-build-cli", "5-build-bundles", "6-deploy-cloud", "7-onboard-cloud"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "✓ cloud system up"
+  print "  cloud gateway: see `gsv config --local get gateway.url`"
+  print "  user: joe"
+  print "  password: fnox get GSV_PASSWORD"
+}
+'''
+
+# ── system-local ──
+["system-local"]
+extends = "system:_base"
+description = "Bring up LOCAL only — steps 1, 2, 3, 4, 8, 9. No CF spend. Local dev stack on :8787."
+depends = ["1-deps", "2-build-web", "3-build-rust", "4-build-cli", "8-up-local", "9-onboard-local"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "✓ local system up"
+  print "  http://localhost:8787 — onboarded as joe"
+  print "  password: fnox get GSV_PASSWORD"
+}
+'''
+
+# ── system-up ──
+["system-up"]
+extends = "system:_base"
+description = "Bring up the FULL system (cloud + local + device)"
+depends = ["system-cloud", "system-local", "10-up-device"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "✓ full system up"
+  print "  cloud:   see `gsv config --local get gateway.url`"
+  print "  local:   http://localhost:8787"
+  print "  device:  connected (see ~/.gsv/logs/node.log)"
+  print ""
+  print "  password: fnox get GSV_PASSWORD"
+}
+'''
+
+# ── destroy-cloud ──
+["destroy-cloud"]
+extends = "system:_base"
+description = "Tear down GSV infra from Cloudflare (reversible — re-run infra-deploy to redeploy)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let repo_root = $env.MISE_PROJECT_ROOT
+  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
+  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
+  let gsv = $"($repo_root)/cli/target/release/gsv"
+  with-env {CF_API_TOKEN: $token, CF_ACCOUNT_ID: $account} {
+    cd $repo_root
+    ^$gsv infra destroy
+  }
+}
+'''
+
+# ── dev ──
+["dev"]
+extends = "system:_base"
+description = "Start wrangler dev for the multi-worker stack (foreground; replaces bash ./scripts/dev-stack.sh)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let repo_root = $env.MISE_PROJECT_ROOT
+  let state = $"($repo_root)/.wrangler/dev-state/v3"
+  [
+    "do/ripgit-Repository"
+    "do/gsv-Kernel"
+    "do/gsv-Process"
+    "do/gsv-channel-whatsapp-WhatsAppAccount"
+  ] | each { |d| mkdir $"($state)/($d)" }
+
+  cd $"($repo_root)/ripgit"
+  ^npm exec -- wrangler dev -c ../gateway/wrangler.jsonc -c ../assembler/wrangler.toml -c ../adapters/whatsapp/wrangler.jsonc -c wrangler.toml --ip 0.0.0.0 --persist-to ../.wrangler/dev-state
+}
+'''
+
+# ── device-run ──
+["device-run"]
+extends = "system:_base"
+description = "Run gsv device daemon in foreground (called BY pitchfork — don't invoke directly; use 10-up-device)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
+  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
+  ^$gsv device run --id $node_id --workspace $env.HOME
+}
+'''
+
+# ── down ──
+["down"]
+extends = "system:_base"
+description = "Stop all local pitchfork-managed daemons (dev-stack, device, ...)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  ^pitchfork stop --local
+}
+'''
+
+# ── status ──
+["status"]
+extends = "system:_base"
+description = "Show pitchfork daemon status (running? healthy?)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  ^pitchfork list
+}
+'''

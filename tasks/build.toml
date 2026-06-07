@@ -1,0 +1,262 @@
+# tasks/build.toml — phased build pipeline (1-deps → 5-build-bundles).
+
+# ── build:_base ──
+# RUSTC_WRAPPER=sccache lives here (not project-level) so mise install of
+# cargo:* tools can run without sccache wrapping the install rustc itself.
+["build:_base"]
+hide = true
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
+
+# ── 1-deps ──
+# Aube is a fast Node package manager (drop-in npm replacement). Reads existing
+# package-lock.json in place. ~2x faster than npm on cold install.
+#
+# Lifecycle-script approvals live in package.json under `aube.allowBuilds` —
+# committed, so every contributor + CI gets the same set without prompts.
+# Currently approved: esbuild, workerd, sharp, protobufjs, core-js-pure,
+# @mongodb-js/zstd. node-liblzma is denied (gyp build fails; transitive,
+# not needed at runtime).
+#
+# Upstream's bash equivalent (scripts/setup-deps.sh) stays untouched as a
+# fallback if anyone wants pure npm.
+["1-deps"]
+extends = "build:_base"
+description = "Step 1 — install JS deps via aube (workspace + adapters + ripgit)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  let repo_root = $env.MISE_PROJECT_ROOT
+  print "→ workspace install via aube..."
+  cd $repo_root
+  ^aube install
+
+  print ""
+  print "→ adapter installs..."
+  # Forward-slash glob pattern that works on Windows. We can't use
+  # `path join` here because nu's path join uses the platform separator
+  # (backslash on Windows), which re-introduces the very characters
+  # nu's glob parser rejects. String interpolation + a final
+  # backslash→forward-slash sweep handles both OSes.
+  let adapters_glob = ($"($repo_root)/adapters/*" | str replace --all '\' '/')
+  glob $adapters_glob
+    | where { |p| ($p | path join package.json | path exists) }
+    | each { |p|
+        print $"  ($p | path basename)"
+        ^aube ci -C $p
+      }
+
+  # whatsapp uses patch-package via npm postinstall. Approve its build.
+  let wa = $"($repo_root)/adapters/whatsapp"
+  if ($wa | path exists) {
+    cd $wa
+    do { ^aube approve-builds --all } | complete | ignore
+    ^aube install -C $wa
+  }
+
+  print ""
+  print "→ ripgit install via aube..."
+  ^aube ci -C $"($repo_root)/ripgit"
+
+  print ""
+  print "✓ all JS deps installed via aube"
+}
+'''
+
+# ── 2-build-web ──
+["2-build-web"]
+extends = "build:_base"
+description = "Step 2 — build the web shell into web/dist (required by gateway worker)"
+depends = ["1-deps"]
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  cd $env.MISE_PROJECT_ROOT
+  ^npm run build --prefix web
+  print "✓ web/dist built"
+}
+'''
+
+# ── 3-build-rust ──
+# Why this exists: wrangler dev's [build].command hooks fire in parallel, and
+# without serialisation the two `cargo build` calls fight over cargo's package
+# cache lock (the bash version uses `flock` to prevent this). By pre-building
+# sequentially via mise, we sidestep wrangler's parallelism — when it does run
+# its [build] hooks, the artefacts are already fresh and the work is a no-op.
+["3-build-rust"]
+extends = "build:_base"
+description = "Step 3 — build the Rust workers (assembler + ripgit) sequentially. Bypasses wrangler's parallel build hooks to avoid cargo cache lock contention."
+run = '''
+#!/usr/bin/env nu
+
+const CRATES = ["assembler", "ripgit"]
+
+def main [] {
+  if (which worker-build | is-empty) {
+    print --stderr "✗ worker-build not on PATH — run `mise install` (mise.toml pins cargo:worker-build)"
+    exit 1
+  }
+
+  let repo_root = $env.MISE_PROJECT_ROOT
+  for crate in $CRATES {
+    let crate_dir = $"($repo_root)/($crate)"
+    print $"→ building ($crate)..."
+    cd $crate_dir
+    ^worker-build --release .
+    print $"  ✓ ($crate) built"
+  }
+
+  print ""
+  print "✓ rust workers ready"
+}
+'''
+
+# ── 4-build-cli ──
+# No depends — cli/ is pure cargo, doesn't need npm deps from 1-deps.
+["4-build-cli"]
+extends = "build:_base"
+description = "Step 4 — build the gsv Rust CLI in release mode (needed for deploy/onboard/device)"
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  cd $"($env.MISE_PROJECT_ROOT)/cli"
+  ^cargo build --release
+}
+'''
+
+# ── 5-build-bundles ──
+# Reimplements scripts/build-cloudflare-bundles.sh in nu. Sequential wrangler
+# --dry-run for each component, then per-component manifest.json (via to json)
+# + tar.gz tarballs + sha256 checksums. Sequential — sidesteps cargo cache
+# contention.
+["5-build-bundles"]
+extends = "build:_base"
+description = "Step 5 — build local Cloudflare deploy bundles (5 workers → release/local/*.tar.gz)"
+depends = ["2-build-web", "3-build-rust"]
+run = '''
+#!/usr/bin/env nu
+
+const COMPONENTS = [
+  {
+    name: "assembler"
+    work_dir: ".",
+    npm_workspace: "assembler",
+    config_src: "assembler/wrangler.toml",
+    config_dst: "wrangler.toml",
+    has_assets: false
+    has_source_map: false
+  }
+  {
+    name: "gateway",
+    work_dir: "gateway",
+    npm_workspace: "",
+    config_src: "gateway/wrangler.jsonc",
+    config_dst: "wrangler.jsonc",
+    has_assets: true,
+    has_source_map: true
+  }
+  {
+    name: "ripgit",
+    work_dir: "ripgit",
+    npm_workspace: "",
+    config_src: "ripgit/wrangler.toml",
+    config_dst: "wrangler.toml",
+    has_assets: false,
+    has_source_map: false
+  }
+  {
+    name: "channel-whatsapp",
+    work_dir: "adapters/whatsapp",
+    npm_workspace: "",
+    config_src: "adapters/whatsapp/wrangler.jsonc",
+    config_dst: "wrangler.jsonc",
+    has_assets: false,
+    has_source_map: true
+  }
+  {
+    name: "channel-discord",
+    work_dir: "adapters/discord",
+    npm_workspace: "",
+    config_src: "adapters/discord/wrangler.jsonc",
+    config_dst: "wrangler.jsonc",
+    has_assets: false,
+    has_source_map: true
+  }
+]
+
+def main [out_dir?: string] {
+  let repo_root = $env.MISE_PROJECT_ROOT
+  let dist = $"($repo_root)/dist/cloudflare"
+  let out = ($out_dir | default $"($repo_root)/release/local")
+
+  $env.COPYFILE_DISABLE = "1"
+  $env.COPY_EXTENDED_ATTRIBUTES_DISABLE = "1"
+
+  print "==> Bundling workers (sequential)"
+  rm -rf $dist
+  mkdir $dist
+  for c in $COMPONENTS {
+    let comp_dist = $"($dist)/($c.name)/worker"
+    mkdir $comp_dist
+    cd $"($repo_root)/($c.work_dir)"
+    if ($c.npm_workspace | is-not-empty) {
+      ^npm exec --workspace $c.npm_workspace -- wrangler deploy --dry-run --config $"($repo_root)/($c.config_src)" --outdir $comp_dist
+    } else {
+      ^npm exec --workspaces=false -- wrangler deploy --dry-run --outdir $comp_dist
+    }
+  }
+
+  print "==> Writing manifests"
+  for c in $COMPONENTS {
+    let manifest_dir = $"($dist)/($c.name)"
+    let entry = "worker/index.js"
+    mut manifest = {component: $c.name, worker: {entrypoint: $entry, wranglerConfig: $c.config_dst}}
+    if $c.has_source_map {
+      $manifest.worker = ($manifest.worker | upsert sourceMap $"($entry).map")
+    }
+    if $c.has_assets {
+      $manifest = ($manifest | upsert assetsDir "assets")
+    }
+    $manifest | to json --indent 2 | save -f $"($manifest_dir)/manifest.json"
+    cp $"($repo_root)/($c.config_src)" $"($manifest_dir)/($c.config_dst)"
+  }
+
+  # Gateway needs the built web SPA bundled as assets/
+  cp -r $"($repo_root)/web/dist" $"($dist)/gateway/assets"
+
+  print "==> Stripping macOS metadata"
+  glob $"($dist)/**/{._*,.DS_Store}"
+    | each { |f| rm -f $f }
+
+  print "==> Tarballing"
+  mkdir $out
+  glob $"($out)/gsv-cloudflare-*.tar.gz" | each { |f| rm -f $f }
+  rm -f $"($out)/cloudflare-checksums.txt"
+  for c in $COMPONENTS {
+    ^tar -C $dist -czf $"($out)/gsv-cloudflare-($c.name).tar.gz" $c.name
+  }
+
+  print "==> Checksums"
+  let lines = (
+    glob $"($out)/gsv-cloudflare-*.tar.gz"
+    | each { |f|
+        let name = ($f | path basename)
+        let hash = (open --raw $f | hash sha256)
+        $"($hash)  ($name)"
+      }
+  )
+  $lines | str join "\n" | save -f $"($out)/cloudflare-checksums.txt"
+
+  print ""
+  print $"✓ bundles ready in ($out):"
+  # `ls $"...*.tar.gz"` errors with DoNotExpand on string-interpolated globs.
+  # Filter the dir listing instead — works whether or not matches exist.
+  ls $out
+    | where { |f| ($f.name | path basename | str starts-with "gsv-cloudflare-") and ($f.name | str ends-with ".tar.gz") }
+    | each { |f| print $"  ($f.name | path basename) \(($f.size)\)" }
+    | ignore
+}
+'''

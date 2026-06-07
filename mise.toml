@@ -1,79 +1,68 @@
+# Required for `extends = "<ns>:_base"` task inheritance (still flagged
+# experimental in mise; behaviour is stable, used by joeblew999/.github v0.18+).
 [settings]
-# extends task-inheritance is mise experimental — joeblew999/.github
-# v0.18+ uses it for per-namespace tools dedup (cf:_base, bw:_base, etc).
 experimental = true
 
 [task_config]
-# Local mise-tasks/ holds gsv's own file-tasks (auto-discovered by mise).
-# Shared library tasks come in via tasks/<ns>.toml URLs at v0.17.3 —
-# each TOML-task block declares its own `tools = { ... }`, so consumers
-# don't need to pin fnox/gh/jq just because a shared task uses them.
-# See joeblew999/.github v0.17.x release notes + tasks-toml-proof.yml.
-#
-# Naming convention (matches .github):
-#   mise-tasks/         → executable file-tasks (auto-discovered locally)
-#   tasks/<ns>.toml     → TOML-task files (consumed remotely via git:: URL)
-#
-# `git::` is mise's prefix for git-fetched configs. The form below is
-# *mise* URL syntax; clicking it in the IDE will 404 because browsers
-# can't follow `git::` and the GitHub blob URL form differs. The
-# browseable equivalents (drop `git::`, drop `.git`, swap `?ref=v…` for
-# `/blob/v…/`):
-#
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/ci.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/cf.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.1/tasks/secrets.toml
+# Browseable URLs for the shared lib (drop `git::`, drop `.git`,
+# swap `?ref=v…` for `/blob/v…/`):
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/ci.toml
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/cf.toml
+#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/secrets.toml
 includes = [
-  "mise-tasks",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.19.1",
-  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.19.1",
+  "tasks/check.toml",
+  "tasks/test.toml",
+  "tasks/build.toml",
+  "tasks/prove.toml",
+  "tasks/system.toml",
+  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.33.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.33.0",
+  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.33.0",
 ]
 
 [tools]
-# pitchfork orchestrates the long-lived daemons (dev-stack, device daemon).
-"github:endevco/pitchfork" = "2.10.0"
-# nu — every gsv local task is a nu file task.
-"github:nushell/nushell" = "0.112"
-# fnox — gsv local tasks read CLOUDFLARE_API_TOKEN, GSV_PASSWORD etc. from it.
-"github:jdx/fnox"        = "1.24"
-# Shared-lib tasks (ci:*, cf:*, secrets:*) bring their own gh + jq via per-task
-# `tools = { ... }`, so we no longer pin them here.
-
-# gsv-specific toolchain (matches existing CI: Node 24, Rust stable + wasm32 target).
+# Language toolchains.
 node = "26"
 rust = { version = "stable", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
-# zig provides `zig cc` for cross-compiling C code to wasm32 (used by ripgit's
-# zstd dep via ripgit/scripts/wasm-cc). Apple clang doesn't ship wasm targets.
+# `zig cc` cross-compiles C → wasm32 for ripgit's zstd-sys (Apple clang has no
+# wasm target). Wired up via .mise-bin/zig-cc + the env vars below.
 zig = "0.16"
 
-# aube — fast Node package manager (drop-in npm replacement).
-"github:endevco/aube" = "1.9.0"
-# sccache — Rust compiler cache. Speeds up local `cargo build` AND CI by caching
-# compiler invocations content-addressably. Set RUSTC_WRAPPER=sccache below.
-# github backend pulls Mozilla's prebuilt binary; cargo backend would chicken-
-# and-egg with RUSTC_WRAPPER.
-"github:mozilla/sccache" = "0.15.0"
+# Task runtime + secrets.
+"github:nushell/nushell" = "0.112"
+"github:jdx/fnox"        = "1.24"
+
+# Long-lived daemon orchestrator (dev-stack, device daemon).
+"github:endevco/pitchfork" = "2.10.0"
+
+# Build helpers.
+"github:endevco/aube"    = "1.9.1"   # npm-compatible package manager
+"github:mozilla/sccache" = "0.15.0"  # cargo compiler cache (see RUSTC_WRAPPER per-task in tasks/build.toml + test.toml)
+"cargo:worker-build"     = "0.7"     # Rust → wasm32 worker bundler (used by 3-build-rust)
 
 [env]
 CARGO_TERM_COLOR = "always"
+# patch-package on node 26 OOMs while applying baileys' patch (reads the
+# whole 3000-file package into memory). Bump the V8 heap so install completes.
+NODE_OPTIONS     = "--max-old-space-size=8192"
+# RUSTC_WRAPPER=sccache is set per-task in tasks/build.toml + tasks/test.toml,
+# NOT at the project level. Project-level RUSTC_WRAPPER trips `mise install` of
+# cargo:* tools (sccache wraps rustc during the install itself and the install
+# subprocess doesn't have sccache on PATH yet). Per-task scope correctly
+# matches the variable's purpose: it's a "when running cargo for our crates"
+# setting, not a "any subprocess that might invoke rustc" setting.
 
-# sccache — speeds up local `cargo build` and CI alike. Locally writes to
-# ~/.cache/sccache; in CI add SCCACHE_GHA_ENABLED=true to use GH Actions cache.
-RUSTC_WRAPPER = "sccache"
-
-# Add project-local shims dir to PATH (no-op flock for macOS where util-linux's
-# flock isn't available, plus zig-cc target translator).
+# Add project-local shims to PATH (zig-cc target translator + macOS flock no-op).
 _.path = [".mise-bin"]
 
-# Force ripgit's wasm-cc shim to use `zig cc` instead of Apple's clang. Apple clang
-# doesn't ship a wasm32-unknown-unknown target; zig does.
-RIPGIT_WASM_CC = "{{config_root}}/.mise-bin/zig-cc"
-# Same for cargo's `cc` crate (used by zstd-sys for build.rs C compilation).
-CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc"
+# Force the wasm32 cc to be `zig cc` instead of Apple clang (which has no wasm target).
+# RIPGIT_WASM_CC is consumed by ripgit/scripts/wasm-cc; CC_wasm32_unknown_unknown
+# is read by cargo's `cc` crate (zstd-sys' build.rs). Two scripts ship: the bash
+# `zig-cc` for macOS/Linux and a `zig-cc.cmd` for Windows (cargo's cc-rs uses
+# CreateProcessW with the literal path, so PATHEXT lookup doesn't apply — we
+# pick the right extension at config time via mise's Tera templating).
+RIPGIT_WASM_CC            = "{{config_root}}/.mise-bin/zig-cc{% if os() == 'windows' %}.cmd{% endif %}"
+CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc{% if os() == 'windows' %}.cmd{% endif %}"
 
-# Which fnox keys get synced to GitHub Actions secrets via `mise run secrets:sync-github`.
+# Which fnox keys `mise run secrets:sync-github` pushes to GH Actions secrets.
 FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,CF_API_TOKEN,CF_ACCOUNT_ID"
-
-# All tasks live in mise-tasks/ as nushell file tasks (with `#MISE description=`
-# and `#MISE depends=[...]` headers). Run `mise tasks ls` to see them.

@@ -6,7 +6,8 @@
     "assembler",
     "gateway",
     "web",
-    "shared/*"
+    "shared/*",
+    "adapters/*"
   ],
   "scripts": {
     "setup": "bash ./scripts/setup-deps.sh",
@@ -28,7 +29,8 @@
       "protobufjs": true,
       "sharp": true,
       "workerd": true,
-      "node-liblzma": false
+      "node-liblzma": false,
+      "@google/genai": "set this to true or false"
     }
   }
 }

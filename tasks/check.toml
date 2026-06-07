@@ -1,0 +1,37 @@
+# tasks/check.toml — top-level CI aggregator.
+#
+# Single entry point invoked by .github/workflows/mise.yml (which calls
+# `mise run check` on linux/macos/windows). To change what CI does, edit
+# the depends list here — never enumerate steps in the YAML.
+#
+# The depends graph exercises the full build chain:
+#   1. ci:parse-check       — nu syntax of every nu file in repo
+#   2. ci:check-toml-tasks  — every inline run = '''…''' body in tasks/*.toml
+#   3. ci:check-workflow-nu — every embedded nu block in workflow YAML
+#   4. test-cli             — cargo test in cli/    (pulls cargo)
+#   5. test-gateway         — vitest + tsc          (pulls 1-deps; skipped on Windows)
+#   6. 5-build-bundles      — full build pipeline   (pulls 1-deps + 2-build-web + 3-build-rust)
+#                                                     produces release/local/*.tar.gz
+#
+# Building bundles in CI catches issues like missing workspace members,
+# broken adapters, and bundling regressions early on all 3 OS, not just at
+# release time. This is the SSOT promise: same mise.toml runs locally + CI.
+
+["check"]
+description = "Run all CI checks (lint + tests + full build chain) on linux/macos/windows."
+depends = [
+  "ci:parse-check",
+  "ci:check-toml-tasks",
+  "ci:check-workflow-nu",
+  "test-cli",
+  "test-gateway",
+  "5-build-bundles",
+]
+tools = { "github:nushell/nushell" = "0.112" }
+run = '''
+#!/usr/bin/env nu
+
+def main [] {
+  print "✓ all checks passed"
+}
+'''
