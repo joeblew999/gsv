@@ -1,6 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="Show pitchfork daemon status (running? healthy?)"
-
-def main [] {
-  ^pitchfork list
-}

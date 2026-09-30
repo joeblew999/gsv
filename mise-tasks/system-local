@@ -1,9 +1,0 @@
-#!/usr/bin/env nu
-#MISE description="Bring up LOCAL only — steps 1, 2, 3, 4, 8, 9. No CF spend. Local dev stack on :8787."
-#MISE depends=["1-deps", "2-build-web", "3-build-rust", "4-build-cli", "8-up-local", "9-onboard-local"]
-
-def main [] {
-  print "✓ local system up"
-  print "  http://localhost:8787 — onboarded as joe"
-  print "  password: fnox get GSV_PASSWORD"
-}

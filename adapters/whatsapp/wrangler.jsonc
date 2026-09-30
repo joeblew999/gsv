@@ -11,7 +11,12 @@
   // Alias packages to our shims
   "alias": {
     "ws": "./src/ws-shim.ts",
-    "axios": "./src/axios-shim.ts"
+    "axios": "./src/axios-shim.ts",
+    // baileys optional deps that are dynamic-import-with-catch — no-op shim
+    // satisfies wrangler's static analysis without bundling Node-only code.
+    "jimp": "./src/optional-noop-shim.ts",
+    "link-preview-js": "./src/optional-noop-shim.ts",
+    "qrcode-terminal": "./src/optional-noop-shim.ts"
   },
   "durable_objects": {
     "bindings": [

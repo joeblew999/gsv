@@ -22,7 +22,8 @@
   },
   "aube": {
     "allowBuilds": {
-      "sharp": true
+      "sharp": true,
+      "protobufjs": true
     }
   }
 }
