@@ -16,22 +16,3 @@
 # Building bundles in CI catches issues like missing workspace members,
 # broken adapters, and bundling regressions early on all 3 OS, not just at
 # release time. This is the SSOT promise: same mise.toml runs locally + CI.
-
-["check"]
-description = "Run all CI checks (lint + tests + full build chain) on linux/macos/windows."
-depends = [
-  "ci:parse-check",
-  "ci:check-toml-tasks",
-  "ci:check-workflow-nu",
-  "test-cli",
-  "test-gateway",
-  "5-build-bundles",
-]
-tools = { "github:nushell/nushell" = "0.112" }
-run = '''
-#!/usr/bin/env nu
-
-def main [] {
-  print "✓ all checks passed"
-}
-'''

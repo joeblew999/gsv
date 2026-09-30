@@ -3,86 +3,9 @@
 # [tools] so we don't re-declare them per task.
 
 # ── system:_base ──
-["system:_base"]
-hide = true
-tools = { "github:nushell/nushell" = "0.112" }
-
 # ── 6-deploy-cloud ──
-["6-deploy-cloud"]
-extends = "system:_base"
-description = "Step 6 — deploy GSV infra to Cloudflare via the gsv CLI (uses fnox-backed CF token)"
-depends = ["cf:token-check", "4-build-cli", "5-build-bundles"]
-run = '''
-#!/usr/bin/env nu
-
-def main [] {
-  let repo_root = $env.MISE_PROJECT_ROOT
-  let token = (^fnox get CLOUDFLARE_API_TOKEN | str trim)
-  let account = (^fnox get CLOUDFLARE_ACCOUNT_ID | str trim)
-  let gsv = $"($repo_root)/cli/target/release/gsv"
-  if not ($gsv | path exists) {
-    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli` first"
-    exit 1
-  }
-
-  with-env {CF_API_TOKEN: $token, CF_ACCOUNT_ID: $account} {
-    cd $repo_root
-    ^$gsv infra deploy --all --bundle-dir ./release/local
-  }
-}
-'''
 
 # ── 7-onboard-cloud ──
-["7-onboard-cloud"]
-extends = "system:_base"
-description = "Step 7 — onboard the CLOUD gateway non-interactively (idempotent; uses fnox-stored password)"
-depends = ["4-build-cli", "6-deploy-cloud"]
-run = '''
-#!/usr/bin/env nu
-
-def ensure-password [] {
-  let existing = (try { ^fnox get GSV_PASSWORD | str trim } catch { "" })
-  if ($existing | is-not-empty) {
-    return $existing
-  }
-  let pw = (random chars --length 32)
-  print --stderr "→ no GSV_PASSWORD in fnox; generating one..."
-  $pw | ^fnox set --provider keychain GSV_PASSWORD
-  print --stderr "✓ saved GSV_PASSWORD to fnox keychain"
-  $pw
-}
-
-def main [] {
-  let pw = (ensure-password)
-  let gsv = $"($env.MISE_PROJECT_ROOT)/cli/target/release/gsv"
-  if not ($gsv | path exists) {
-    print --stderr "✗ gsv binary not found — run `mise run 4-build-cli`"
-    exit 1
-  }
-
-  # The cloud gateway URL must be configured. We don't guess an account.
-  let url = (try { ^$gsv config --local get gateway.url | str trim } catch { "" })
-  if ($url | is-empty) {
-    print --stderr "✗ gateway.url not set in local gsv config — run e.g.:"
-    print --stderr "    gsv config --local set gateway.url wss://gsv.<account>.workers.dev/ws"
-    exit 1
-  }
-
-  let node_id = (try { ^$gsv config --local get node.id | str trim } catch { "" } | default (sys host | get hostname))
-  print $"→ onboarding ($url) as node ($node_id)..."
-  let result = (do { ^$gsv --url $url auth setup --username joe --new-password $pw --node-id $node_id --node-label $node_id } | complete)
-
-  if $result.exit_code == 0 {
-    print $"✓ cloud onboarded \(($url)\)"
-  } else if (($result.stderr | default "") | str contains "setup mode") {
-    print $"✓ cloud already onboarded \(($url)\) — skipping"
-  } else {
-    print --stderr "✗ cloud onboard failed:"
-    print --stderr ($result.stderr | default $result.stdout)
-    exit 1
-  }
-}
-'''
 
 # ── 8-up-local ──
 # Pre-builds web and rust so wrangler dev's parallel [build] hooks find fresh
@@ -186,20 +109,6 @@ def main [] {
 '''
 
 # ── system-cloud ──
-["system-cloud"]
-extends = "system:_base"
-description = "Bring up CLOUD only — steps 1→4, 5, 6, 7. Provisions CF resources + onboards. Costs money."
-depends = ["1-deps", "2-build-web", "3-build-rust", "4-build-cli", "5-build-bundles", "6-deploy-cloud", "7-onboard-cloud"]
-run = '''
-#!/usr/bin/env nu
-
-def main [] {
-  print "✓ cloud system up"
-  print "  cloud gateway: see `gsv config --local get gateway.url`"
-  print "  user: joe"
-  print "  password: fnox get GSV_PASSWORD"
-}
-'''
 
 # ── system-local ──
 ["system-local"]
@@ -217,22 +126,6 @@ def main [] {
 '''
 
 # ── system-up ──
-["system-up"]
-extends = "system:_base"
-description = "Bring up the FULL system (cloud + local + device)"
-depends = ["system-cloud", "system-local", "10-up-device"]
-run = '''
-#!/usr/bin/env nu
-
-def main [] {
-  print "✓ full system up"
-  print "  cloud:   see `gsv config --local get gateway.url`"
-  print "  local:   http://localhost:8787"
-  print "  device:  connected (see ~/.gsv/logs/node.log)"
-  print ""
-  print "  password: fnox get GSV_PASSWORD"
-}
-'''
 
 # ── destroy-cloud ──
 ["destroy-cloud"]

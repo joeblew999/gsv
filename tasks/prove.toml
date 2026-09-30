@@ -7,10 +7,6 @@
 # Note: gsv's prove-* tasks are NOT the same as joeblew999/.github's
 # prove:* namespace (which probes CF Access deployments). gsv doesn't
 # include that shared file — these are gsv-stack-specific probes.
-["prove:_base"]
-hide = true
-tools = { "github:nushell/nushell" = "0.112" }
-
 # ── prove-all ──
 ["prove-all"]
 extends = "prove:_base"

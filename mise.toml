@@ -1,24 +1,33 @@
+# Project-local tasks only. See MISE-RETIREMENT.md for retired workflows and prerequisites.
 # Required for `extends = "<ns>:_base"` task inheritance (still flagged
-# experimental in mise; behaviour is stable, used by joeblew999/.github v0.18+).
 [settings]
 experimental = true
 
 [task_config]
-# Browseable URLs for the shared lib (drop `git::`, drop `.git`,
 # swap `?ref=v…` for `/blob/v…/`):
-#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/ci.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/cf.toml
-#   https://github.com/joeblew999/.github/blob/v0.19.2/tasks/secrets.toml
 includes = [
   "tasks/check.toml",
   "tasks/test.toml",
   "tasks/build.toml",
   "tasks/prove.toml",
   "tasks/system.toml",
-  "git::https://github.com/joeblew999/.github.git//tasks/ci.toml?ref=v0.33.0",
-  "git::https://github.com/joeblew999/.github.git//tasks/cf.toml?ref=v0.33.0",
-  "git::https://github.com/joeblew999/.github.git//tasks/secrets.toml?ref=v0.33.0",
 ]
+
+# Task templates must live here (mise does not read them from included task
+# files). Tasks in tasks/*.toml pick them up with `extends = "<name>"`.
+[task_templates."test:_base"]
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
+
+[task_templates."system:_base"]
+tools = { "github:nushell/nushell" = "0.112" }
+
+[task_templates."build:_base"]
+tools = { "github:nushell/nushell" = "0.112" }
+env = { RUSTC_WRAPPER = "sccache" }
+
+[task_templates."prove:_base"]
+tools = { "github:nushell/nushell" = "0.112" }
 
 [tools]
 # Language toolchains.
@@ -65,4 +74,3 @@ RIPGIT_WASM_CC            = "{{config_root}}/.mise-bin/zig-cc{% if os() == 'wind
 CC_wasm32_unknown_unknown = "{{config_root}}/.mise-bin/zig-cc{% if os() == 'windows' %}.cmd{% endif %}"
 
 # Which fnox keys `mise run secrets:sync-github` pushes to GH Actions secrets.
-FNOX_SYNC_KEYS = "CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,CF_API_TOKEN,CF_ACCOUNT_ID"

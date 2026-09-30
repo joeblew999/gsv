@@ -3,11 +3,6 @@
 # ── build:_base ──
 # RUSTC_WRAPPER=sccache lives here (not project-level) so mise install of
 # cargo:* tools can run without sccache wrapping the install rustc itself.
-["build:_base"]
-hide = true
-tools = { "github:nushell/nushell" = "0.112" }
-env = { RUSTC_WRAPPER = "sccache" }
-
 # ── 1-deps ──
 # Aube is a fast Node package manager (drop-in npm replacement). Reads existing
 # package-lock.json in place. ~2x faster than npm on cold install.
